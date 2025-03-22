@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from app.db.session import get_db
@@ -8,7 +8,9 @@ from app.api.schemas.knowledge import (
     KnowledgePoint, 
     KnowledgePointCreate,
     KnowledgePointSearch,
-    KnowledgeStructure
+    KnowledgeStructure,
+    MarkCreate,
+    Mark
 )
 from app.models.user import User
 
@@ -118,4 +120,38 @@ async def mark_knowledge_point(
     knowledge_point = knowledge_service.increment_knowledge_point_mark_count(db, knowledge_point_id)
     if not knowledge_point:
         raise HTTPException(status_code=404, detail="知识点不存在")
-    return knowledge_point 
+    return knowledge_point
+
+@router.post("/user-mark", response_model=Mark, status_code=status.HTTP_201_CREATED)
+async def create_user_mark(
+    mark_data: MarkCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    创建用户知识点标记记录
+    """
+    # 确认知识点存在
+    knowledge_point = knowledge_service.get_knowledge_point_by_id(db, mark_data.knowledge_point_id)
+    if not knowledge_point:
+        raise HTTPException(status_code=404, detail="知识点不存在")
+    
+    # 创建标记
+    user_mark = knowledge_service.create_user_mark(
+        db=db,
+        user_id=current_user.id,
+        knowledge_point_id=mark_data.knowledge_point_id,
+        question_id=mark_data.question_id
+    )
+    
+    return user_mark
+
+@router.get("/user-marks", response_model=List[Mark])
+async def get_user_marks(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取当前用户的所有标记
+    """
+    return knowledge_service.get_user_marks(db, current_user.id) 

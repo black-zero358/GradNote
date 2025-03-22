@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from app.models.knowledge import KnowledgePoint
+from app.models.knowledge import KnowledgePoint, UserMark
+from datetime import datetime
 
 def get_knowledge_points_by_structure(
     db: Session,
@@ -165,4 +166,63 @@ def increment_knowledge_point_mark_count(db: Session, knowledge_point_id: int) -
         db.commit()
         db.refresh(knowledge_point)
         return knowledge_point
-    return None 
+    return None
+
+def create_user_mark(
+    db: Session, 
+    user_id: int, 
+    knowledge_point_id: int, 
+    question_id: int
+) -> UserMark:
+    """
+    创建用户知识点标记记录
+
+    Parameters:
+    - db: 数据库会话
+    - user_id: 用户ID
+    - knowledge_point_id: 知识点ID
+    - question_id: 相关错题ID
+
+    Returns:
+    - 创建的用户标记记录
+    """
+    # 检查标记是否已存在
+    existing_mark = db.query(UserMark).filter(
+        UserMark.user_id == user_id,
+        UserMark.knowledge_point_id == knowledge_point_id,
+        UserMark.question_id == question_id
+    ).first()
+    
+    if existing_mark:
+        return existing_mark
+    
+    # 创建新标记
+    mark = UserMark(
+        user_id=user_id,
+        knowledge_point_id=knowledge_point_id,
+        question_id=question_id,
+        marked_at=datetime.now()
+    )
+    
+    # 增加知识点标记计数
+    knowledge_point = get_knowledge_point_by_id(db, knowledge_point_id)
+    if knowledge_point:
+        knowledge_point.mark_count += 1
+    
+    db.add(mark)
+    db.commit()
+    db.refresh(mark)
+    return mark
+
+def get_user_marks(db: Session, user_id: int) -> List[UserMark]:
+    """
+    获取用户的所有标记
+
+    Parameters:
+    - db: 数据库会话
+    - user_id: 用户ID
+
+    Returns:
+    - 用户标记列表
+    """
+    return db.query(UserMark).filter(UserMark.user_id == user_id).all() 

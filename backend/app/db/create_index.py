@@ -55,7 +55,10 @@ def create_indexes():
                 connection.execute(text(vector_index_sql))
                 logger.info("成功创建向量索引")
             except Exception as e:
-                logger.warning(f"创建向量索引失败，可能是向量扩展未启用: {e}")
+                if "operator class" in str(e).lower() or "does not exist" in str(e).lower():
+                    logger.warning(f"创建向量索引失败: pgvector扩展未启用。请在PostgreSQL中运行 'CREATE EXTENSION vector;'")
+                else:
+                    logger.warning(f"创建向量索引失败: {e}")
             
             connection.commit()
             logger.info("所有数据库索引创建成功！")

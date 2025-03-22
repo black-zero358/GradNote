@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 class KnowledgePointBase(BaseModel):
@@ -25,9 +25,7 @@ class KnowledgePoint(KnowledgePointBase):
     mark_count: int
     created_at: datetime
     
-    class Config:
-        orm_mode = True
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class KnowledgePointSearch(BaseModel):
     subject: Optional[str] = None
@@ -52,8 +50,7 @@ class Mark(MarkCreate):
     user_id: int
     marked_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class KnowledgePointWithRelation(KnowledgePoint):
     relation_id: int
