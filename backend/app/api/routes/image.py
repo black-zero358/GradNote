@@ -18,11 +18,25 @@ async def process_image(
     """
     处理错题图像并提取文本
     
+    此API仅进行图像处理并返回结果，不会在数据库中创建错题。
+    常用于：
+    1. 预览图像识别结果
+    2. 获取图像文本后由前端进行进一步处理
+    3. 作为其他API的基础服务（如/questions/from-image调用了此服务）
+    
+    处理流程:
+    1. 上传并保存图片到服务器
+    2. 使用图像处理服务提取文本内容
+    3. 返回提取的文本和保存的图片URL
+    
     参数:
-    - file: 上传的图像文件
+    - file: 要处理的图像文件
     
     返回:
-    - 提取的文本内容和图像URL
+    - status: 处理状态 (success/error)
+    - text: 从图像中提取的文本
+    - image_url: 保存后的图像URL
+    - message: 错误信息（仅当status为error时）
     """
     # 检查文件类型
     if not file.content_type.startswith('image/'):

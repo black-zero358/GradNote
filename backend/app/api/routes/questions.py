@@ -6,6 +6,7 @@ from app.models.user import User
 from app.models.question import WrongQuestion
 from app.api.schemas.question import Question, QuestionCreate, QuestionUpdate, QuestionResponse
 from app.services import image as image_service
+from app.api.routes.image import process_image
 
 router = APIRouter()
 
@@ -110,16 +111,6 @@ async def delete_question(
     db.commit()
     return question
 
-@router.post("/image", response_model=str)
-async def upload_image(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user)
-):
-    """上传错题图片"""
-    # 这里只是一个占位实现，实际需要处理文件上传和存储
-    # 并且调用VLM提取文本
-    return "image_url_placeholder"
-
 @router.post("/from-image", response_model=QuestionResponse)
 async def create_question_from_image(
     file: UploadFile = File(...),
@@ -129,11 +120,20 @@ async def create_question_from_image(
     """
     从图片创建错题
     
+    此API将图片处理与错题创建结合在一起，一步完成从图片提取文本并创建错题的过程。
+    
+    处理流程:
+    1. 上传图片
+    2. 使用图像处理服务提取文本内容
+    3. 将提取的文本及图片URL保存为新的错题
+    
     参数:
-    - file: 错题图片
+    - file: 错题图片文件
     
     返回:
-    - 创建的错题信息
+    - status: 处理状态 (success/error)
+    - data: 创建的错题信息
+    - message: 操作结果消息
     """
     # 检查文件类型
     if not file.content_type.startswith('image/'):
@@ -145,8 +145,10 @@ async def create_question_from_image(
     # 读取文件内容
     file_content = await file.read()
     
-    # 处理图像
-    result = await image_service.process_question_image(file_content, file.filename)
+    # 复用图像处理API
+    mock_file = UploadFile(filename=file.filename)
+    mock_file._file = file.file
+    result = await process_image(file=mock_file, db=db, current_user=current_user)
     
     if result["status"] == "error":
         raise HTTPException(
@@ -169,8 +171,19 @@ async def create_question_from_image(
     db.commit()
     db.refresh(db_question)
     
+    # 将 SQLAlchemy 模型转换为字典，而不是直接返回模型对象
+    question_dict = {
+        "id": db_question.id,
+        "user_id": db_question.user_id,
+        "content": db_question.content,
+        "solution": db_question.solution,
+        "remarks": db_question.remarks,
+        "image_url": db_question.image_url,
+        "created_at": db_question.created_at
+    }
+    
     return {
         "status": "success",
-        "data": db_question,
+        "data": question_dict,
         "message": "从图片创建错题成功"
     } 
