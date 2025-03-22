@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "123456")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "GradNote")
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
-    DATABASE_URI: Optional[PostgresDsn] = None
+    DATABASE_URI: Optional[str] = None
     
     @field_validator("DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: ValidationInfo) -> Any:
@@ -32,16 +32,10 @@ class Settings(BaseSettings):
         for key in required_keys:
             if key not in data or not data.get(key):
                 # 如果配置不完整，返回一个默认的本地开发URI
-                return f"postgresql://postgres:123456@localhost:5432/GradNote"
-            
-        return PostgresDsn.build(
-            scheme="postgresql",
-            username=data.get("POSTGRES_USER"),
-            password=data.get("POSTGRES_PASSWORD"),
-            host=data.get("POSTGRES_SERVER"),
-            port=int(data.get("POSTGRES_PORT")),
-            path=f"/{data.get('POSTGRES_DB') or ''}",
-        )
+                return "postgresql://postgres:123456@localhost:5432/GradNote"
+        
+        # 使用字符串拼接而不是PostgresDsn.build，避免编码问题
+        return f"postgresql://{data.get('POSTGRES_USER')}:{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}:{data.get('POSTGRES_PORT')}/{data.get('POSTGRES_DB')}"
     
     # Redis配置
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
@@ -51,7 +45,6 @@ class Settings(BaseSettings):
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "deepseek-r1-250120")
     VLM_MODEL: str = os.getenv("VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "doubao-embedding-large-text-240915")
     
     # LangSmith配置
     LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "false")

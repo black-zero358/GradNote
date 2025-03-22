@@ -5,7 +5,7 @@
 ## 环境要求
 
 - Python 3.8+
-- PostgreSQL 14+（需启用pgvector扩展）
+- PostgreSQL 14+
 - Redis（可选，用于缓存）
 
 ## 安装步骤
@@ -58,7 +58,6 @@ SECRET_KEY=your-secret-key-for-production
 LLM_API_KEY=your-llm-api-key
 LLM_MODEL=deepseek-r1-250120
 VLM_MODEL=doubao-1-5-vision-pro-32k-250115
-EMBEDDING_MODEL=doubao-embedding-large-text-240915
 
 # LangSmith配置（可选）
 LANGCHAIN_TRACING_V2=false
@@ -74,12 +73,6 @@ LANGCHAIN_API_KEY=your-langsmith-api-key
 2. 创建数据库：
    ```sql
    CREATE DATABASE "GradNote";
-   ```
-
-3. 启用pgvector扩展（用于向量检索）：
-   ```sql
-   \c GradNote
-   CREATE EXTENSION IF NOT EXISTS vector;
    ```
 
 ## 运行应用
@@ -175,11 +168,7 @@ backend/
    - 检查数据库连接信息是否正确
    - 确认用户拥有足够的权限
 
-2. **pgvector扩展问题**：
-   - 确认已安装pgvector：`CREATE EXTENSION vector;`
-   - 如果不需要向量搜索功能，可以忽略相关错误
-
-3. **API认证问题**：
+2. **API认证问题**：
    - 默认用户名/密码：admin/admin
    - 登录接口：`POST /api/v1/auth/login`
    - 大多数API需要认证，请在请求头中添加Token：`Authorization: Bearer <token>`

@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from app.db.session import Base
-import pgvector.sqlalchemy
 
 class KnowledgePoint(Base):
     __tablename__ = "knowledge_points"
@@ -13,7 +12,6 @@ class KnowledgePoint(Base):
     item = Column(String(100), nullable=False)
     details = Column(Text)
     mark_count = Column(Integer, default=0)
-    vector_embedding = Column(pgvector.sqlalchemy.Vector(4096))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class QuestionKnowledgeRelation(Base):
