@@ -1,0 +1,17 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+sqlalchemy==2.0.25
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-jose==3.3.0
+passlib==1.7.4
+python-multipart==0.0.6
+psycopg2-binary==2.9.9
+langchain==0.1.1
+langchain-openai==0.0.5
+langsmith==0.1.5
+pgvector==0.2.4
+redis==5.0.1
+python-dotenv==1.0.0
+alembic==1.13.1
+httpx==0.26.0 
