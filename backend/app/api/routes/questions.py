@@ -146,9 +146,11 @@ async def create_question_from_image(
     file_content = await file.read()
     
     # 复用图像处理API
-    mock_file = UploadFile(filename=file.filename)
-    mock_file._file = file.file
-    result = await process_image(file=mock_file, db=db, current_user=current_user)
+    # 修复 UploadFile 初始化问题
+    # 需要重新定位文件指针到开始位置
+    await file.seek(0)
+    # 直接传递已有的 file 对象而不是尝试创建新的
+    result = await process_image(file=file, db=db, current_user=current_user)
     
     if result["status"] == "error":
         raise HTTPException(
