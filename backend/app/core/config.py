@@ -1,6 +1,6 @@
 import os
 from typing import Optional, Dict, Any, List
-from pydantic import PostgresDsn, field_validator
+from pydantic import PostgresDsn, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -14,31 +14,33 @@ class Settings(BaseSettings):
     # 数据库配置
     POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "gradnote")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "123456")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "GradNote")
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
     DATABASE_URI: Optional[PostgresDsn] = None
     
     @field_validator("DATABASE_URI", mode="before")
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    def assemble_db_connection(cls, v: Optional[str], info: ValidationInfo) -> Any:
         if isinstance(v, str):
             return v
         
-        # 确保所有必要的数据库配置都存在
-        required_values = ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_SERVER", "POSTGRES_PORT", "POSTGRES_DB"]
-        missing_values = [key for key in required_values if key not in values or not values.get(key)]
+        # 获取当前值
+        data = info.data
         
-        if missing_values:
-            # 如果配置不完整，返回一个默认的本地开发URI
-            return f"postgresql://postgres:postgres@localhost:5432/gradnote"
+        # 确保所有必要的数据库配置都存在
+        required_keys = ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_SERVER", "POSTGRES_PORT", "POSTGRES_DB"]
+        for key in required_keys:
+            if key not in data or not data.get(key):
+                # 如果配置不完整，返回一个默认的本地开发URI
+                return f"postgresql://postgres:123456@localhost:5432/GradNote"
             
         return PostgresDsn.build(
             scheme="postgresql",
-            username=values.get("POSTGRES_USER"),
-            password=values.get("POSTGRES_PASSWORD"),
-            host=values.get("POSTGRES_SERVER"),
-            port=values.get("POSTGRES_PORT"),
-            path=f"/{values.get('POSTGRES_DB') or ''}",
+            username=data.get("POSTGRES_USER"),
+            password=data.get("POSTGRES_PASSWORD"),
+            host=data.get("POSTGRES_SERVER"),
+            port=int(data.get("POSTGRES_PORT")),
+            path=f"/{data.get('POSTGRES_DB') or ''}",
         )
     
     # Redis配置

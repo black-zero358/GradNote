@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 
 from app.api.routes.api import api_router
 from app.core.config import settings
+from app.db.create_tables import create_tables
+from app.db.init_db import init_db
+from app.db.session import SessionLocal
 
 # 加载环境变量
 load_dotenv()
@@ -27,6 +30,18 @@ app.add_middleware(
 
 # 添加API路由
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+@app.on_event("startup")
+async def startup_db_client():
+    """应用启动时创建数据库表并初始化数据"""
+    # 创建所有表
+    create_tables()
+    # 初始化数据库数据
+    db = SessionLocal()
+    try:
+        init_db(db)
+    finally:
+        db.close()
 
 @app.get("/")
 async def root():

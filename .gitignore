@@ -7,3 +7,17 @@
 项目架构细节.md
 
 roadmap.md
+
+.env
+
+.env.local
+
+.env.development
+
+__pycache__/
+
+.DS_Store
+
+.venv
+
+

@@ -10,8 +10,8 @@ services:
     environment:
       - POSTGRES_SERVER=db
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=gradnote
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=GradNote
       - REDIS_HOST=redis
     depends_on:
       - db
@@ -25,8 +25,8 @@ services:
       - "5432:5432"
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=gradnote
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=GradNote
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
