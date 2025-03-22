@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.api import api_router
 from app.core.config import settings
@@ -28,6 +29,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 配置静态文件服务
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # 添加API路由
 app.include_router(api_router, prefix=settings.API_V1_STR)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 
 class QuestionBase(BaseModel):
@@ -26,4 +26,9 @@ class Question(QuestionBase):
     created_at: datetime
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class QuestionResponse(BaseModel):
+    status: str
+    data: Optional[Any] = None
+    message: Optional[str] = None 

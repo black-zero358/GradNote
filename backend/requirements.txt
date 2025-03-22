@@ -17,3 +17,4 @@ pytest-asyncio==0.23.2
 httpx
 redis==5.0.1
 jinja2
+aiofiles

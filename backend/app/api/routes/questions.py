@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_active_user
 from app.models.user import User
 from app.models.question import WrongQuestion
-from app.api.schemas.question import Question, QuestionCreate, QuestionUpdate
+from app.api.schemas.question import Question, QuestionCreate, QuestionUpdate, QuestionResponse
+from app.services import image as image_service
 
 router = APIRouter()
 
@@ -117,4 +118,59 @@ async def upload_image(
     """上传错题图片"""
     # 这里只是一个占位实现，实际需要处理文件上传和存储
     # 并且调用VLM提取文本
-    return "image_url_placeholder" 
+    return "image_url_placeholder"
+
+@router.post("/from-image", response_model=QuestionResponse)
+async def create_question_from_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    从图片创建错题
+    
+    参数:
+    - file: 错题图片
+    
+    返回:
+    - 创建的错题信息
+    """
+    # 检查文件类型
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅支持图像文件"
+        )
+    
+    # 读取文件内容
+    file_content = await file.read()
+    
+    # 处理图像
+    result = await image_service.process_question_image(file_content, file.filename)
+    
+    if result["status"] == "error":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result["message"]
+        )
+    
+    # 创建错题
+    question_data = {
+        "content": result["text"],
+        "image_url": result["image_url"]
+    }
+    
+    # 保存到数据库
+    db_question = WrongQuestion(
+        user_id=current_user.id,
+        **question_data
+    )
+    db.add(db_question)
+    db.commit()
+    db.refresh(db_question)
+    
+    return {
+        "status": "success",
+        "data": db_question,
+        "message": "从图片创建错题成功"
+    } 
