@@ -8,6 +8,8 @@
 
 roadmap.md
 
+backend/uploads/*
+
 .env
 
 .env.local
