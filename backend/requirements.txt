@@ -9,6 +9,7 @@ python-multipart==0.0.6
 psycopg2
 langchain
 langchain-openai
+langgraph
 langfuse==2.4.0
 python-dotenv
 pytest
