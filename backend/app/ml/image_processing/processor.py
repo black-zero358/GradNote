@@ -1,7 +1,11 @@
 import os
 import json
 import base64
-from typing import Optional, Tuple
+import logging
+import re
+from pathlib import Path
+from typing import Optional, Tuple, Union
+
 from langchain_openai import ChatOpenAI
 from langchain.schema.messages import HumanMessage, SystemMessage
 from langfuse.callback import CallbackHandler
@@ -10,6 +14,9 @@ from langfuse.callback import CallbackHandler
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 OPENAI_VLM_MODEL = os.getenv("OPENAI_VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
+
+# 默认的最大图片大小 (20MB)
+DEFAULT_MAX_IMAGE_SIZE = 20 * 1024 * 1024
 
 # 图片格式对应的MIME类型
 MIME_TYPES = {
@@ -34,10 +41,29 @@ MAGIC_BYTES = {
     b'\x4d\x4d\x00\x2a': 'tiff',      # TIFF
 }
 
+# 配置日志
+logger = logging.getLogger(__name__)
+
+class ImageProcessorError(Exception):
+    """图像处理器异常基类"""
+    pass
+
+class ImageSizeExceededError(ImageProcessorError):
+    """图像大小超出限制异常"""
+    pass
+
+class ImageFormatError(ImageProcessorError):
+    """图像格式错误异常"""
+    pass
+
 class ImageProcessor:
     """图像处理类，用于将错题图片转换为文本"""
     
-    def __init__(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model_name: Optional[str] = None):
+    def __init__(self, 
+                 api_key: Optional[str] = None, 
+                 api_base: Optional[str] = None, 
+                 model_name: Optional[str] = None,
+                 max_image_size: int = DEFAULT_MAX_IMAGE_SIZE):
         """
         初始化图像处理器
         
@@ -45,6 +71,7 @@ class ImageProcessor:
             api_key: API密钥，默认从环境变量获取
             api_base: API基础URL，默认从环境变量获取
             model_name: VLM模型名称，默认从环境变量获取
+            max_image_size: 最大处理图片大小（字节），默认20MB
         """
         self.langfuse_handler = CallbackHandler()
         self.vlm = ChatOpenAI(
@@ -53,6 +80,66 @@ class ImageProcessor:
             model_name=model_name or OPENAI_VLM_MODEL,
             callbacks=[self.langfuse_handler]
         )
+        self.max_image_size = max_image_size
+    
+    def _validate_file_path(self, image_path: str) -> str:
+        """
+        验证文件路径的安全性和有效性
+        
+        Args:
+            image_path: 图像文件路径
+            
+        Returns:
+            绝对路径字符串
+            
+        Raises:
+            ValueError: 路径无效或不存在
+            ImageProcessorError: 文件不是图片
+        """
+        # 确保路径存在且为文件
+        path = Path(image_path).resolve()
+        if not path.exists():
+            logger.error(f"文件不存在: {image_path}")
+            raise ValueError(f"文件不存在: {image_path}")
+        if not path.is_file():
+            logger.error(f"路径不是文件: {image_path}")
+            raise ValueError(f"路径不是文件: {image_path}")
+        
+        # 检查文件大小
+        file_size = path.stat().st_size
+        if file_size > self.max_image_size:
+            logger.error(f"图片大小({file_size}字节)超过限制({self.max_image_size}字节)")
+            raise ImageSizeExceededError(
+                f"图片大小({file_size}字节)超过限制({self.max_image_size}字节)"
+            )
+        
+        # 检查文件扩展名是否为已知图像格式
+        ext = path.suffix.lstrip('.').lower()
+        if ext not in MIME_TYPES:
+            logger.warning(f"未知的图片扩展名: {ext}")
+        
+        return str(path)
+    
+    def _is_valid_base64(self, base64_str: str) -> bool:
+        """
+        检查字符串是否为有效的base64编码
+        
+        Args:
+            base64_str: 待检查的base64字符串
+            
+        Returns:
+            是否为有效的base64编码
+        """
+        try:
+            # 检查字符是否符合base64编码规则 (A-Z, a-z, 0-9, +, /, =)
+            if not re.match(r'^[A-Za-z0-9+/]+={0,2}$', base64_str):
+                return False
+            
+            # 尝试解码
+            decoded = base64.b64decode(base64_str)
+            return True
+        except Exception:
+            return False
     
     def _detect_image_type_from_bytes(self, image_bytes: bytes) -> str:
         """
@@ -75,59 +162,41 @@ class ImageProcessor:
         # 无法识别则返回默认值
         return default_mime
     
-    def _detect_image_type(self, image_path: str = None, image_bytes: bytes = None) -> str:
+    def _load_and_detect_image(self, image_path: str) -> Tuple[str, bytes]:
         """
-        检测图像类型
-        
-        Args:
-            image_path: 图像文件路径
-            image_bytes: 图像字节数据
-            
-        Returns:
-            图像类型的MIME字符串
-        """
-        # 默认MIME类型
-        default_mime = 'image/png'
-        
-        # 如果提供了文件路径
-        if image_path:
-            # 先尝试从文件扩展名获取
-            _, ext = os.path.splitext(image_path)
-            if ext:
-                # 去掉点号并转为小写
-                ext = ext[1:].lower()
-                if ext in MIME_TYPES:
-                    return MIME_TYPES[ext]
-            
-            # 如果扩展名不存在或无法识别，尝试读取文件并检测魔术字节
-            try:
-                with open(image_path, 'rb') as f:
-                    file_start = f.read(8)  # 读取前8个字节用于识别
-                    return self._detect_image_type_from_bytes(file_start)
-            except Exception:
-                pass
-        
-        # 如果提供了字节数据
-        elif image_bytes:
-            return self._detect_image_type_from_bytes(image_bytes[:8])
-        
-        # 无法识别则返回默认值
-        return default_mime
-    
-    def _encode_image(self, image_path: str) -> Tuple[str, str]:
-        """
-        将图像编码为base64字符串
+        加载图像文件并检测其类型
         
         Args:
             image_path: 图像文件路径
             
         Returns:
-            Tuple[str, str]: (MIME类型, base64编码的图像字符串)
+            Tuple[str, bytes]: (MIME类型, 图像字节数据)
+            
+        Raises:
+            OSError: 文件读取错误
+            ImageProcessorError: 图像处理错误
         """
-        with open(image_path, "rb") as image_file:
-            image_data = image_file.read()
-            mime_type = self._detect_image_type(image_path=image_path, image_bytes=image_data)
-            return mime_type, base64.b64encode(image_data).decode('utf-8')
+        # 验证文件路径
+        validated_path = self._validate_file_path(image_path)
+        
+        try:
+            # 读取文件
+            with open(validated_path, "rb") as image_file:
+                image_data = image_file.read()
+            
+            # 检测MIME类型
+            # 先尝试从扩展名获取
+            ext = Path(validated_path).suffix.lstrip('.').lower()
+            mime_type = MIME_TYPES.get(ext)
+            
+            # 如果扩展名不存在或无法识别，尝试通过魔术字节判断
+            if not mime_type:
+                mime_type = self._detect_image_type_from_bytes(image_data[:8])
+                
+            return mime_type, image_data
+        except OSError as e:
+            logger.error(f"读取图片文件时出错: {str(e)}")
+            raise ImageProcessorError(f"读取图片文件时出错: {str(e)}")
     
     def process_image_file(self, image_path: str) -> str:
         """
@@ -138,12 +207,22 @@ class ImageProcessor:
             
         Returns:
             提取的文本内容
+            
+        Raises:
+            ImageProcessorError: 图像处理错误
         """
-        # 编码图像并获取MIME类型
-        mime_type, base64_image = self._encode_image(image_path)
-        
-        # 调用VLM提取文本
-        return self.process_image_base64(base64_image, mime_type)
+        try:
+            # 加载图像并检测类型
+            mime_type, image_data = self._load_and_detect_image(image_path)
+            
+            # 编码为base64
+            base64_image = base64.b64encode(image_data).decode('utf-8')
+            
+            # 调用VLM提取文本
+            return self.process_image_base64(base64_image, mime_type)
+        except Exception as e:
+            logger.error(f"处理图像文件时出错: {str(e)}")
+            raise ImageProcessorError(f"处理图像文件时出错: {str(e)}")
     
     def process_image_base64(self, base64_image: str, mime_type: str = 'image/png') -> str:
         """
@@ -155,31 +234,52 @@ class ImageProcessor:
             
         Returns:
             提取的文本内容
+            
+        Raises:
+            ValueError: base64字符串无效
+            ImageProcessorError: 图像处理错误
         """
-        # 创建消息
-        messages = [
-            SystemMessage(content="你是一个专业的OCR助手，任务是从图片中准确提取文字内容，特别是识别数学公式、物理符号等学科内容。请尽可能保持原始格式，完整输出所有文本内容。"),
-            HumanMessage(
-                content=[
-                    {
-                        "type": "text", 
-                        "text": "请提取这张错题图片中的所有文本内容，包括题目、选项等。保持原始格式，不要遗漏任何文字和符号。"
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{base64_image}"
-                        }
-                    }
-                ]
+        # 验证base64字符串
+        if not self._is_valid_base64(base64_image):
+            logger.error("提供的字符串不是有效的base64编码")
+            raise ValueError("提供的字符串不是有效的base64编码")
+        
+        # 检查图片大小（近似值，base64编码比原始数据大约大1/3）
+        approx_size = (len(base64_image) * 3) // 4
+        if approx_size > self.max_image_size:
+            logger.error(f"解码后图片大小(约{approx_size}字节)超过限制({self.max_image_size}字节)")
+            raise ImageSizeExceededError(
+                f"解码后图片大小(约{approx_size}字节)超过限制({self.max_image_size}字节)"
             )
-        ]
         
-        # 调用VLM
-        response = self.vlm.invoke(messages)
-        
-        # 返回内容
-        return response.content
+        try:
+            # 创建消息
+            messages = [
+                SystemMessage(content="你是一个专业的OCR助手，任务是从图片中准确提取文字内容，特别是识别数学公式、物理符号等学科内容。请尽可能保持原始格式，完整输出所有文本内容。"),
+                HumanMessage(
+                    content=[
+                        {
+                            "type": "text", 
+                            "text": "请提取这张错题图片中的所有文本内容，包括题目、选项等。保持原始格式，不要遗漏任何文字和符号。"
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{base64_image}"
+                            }
+                        }
+                    ]
+                )
+            ]
+            
+            # 调用VLM
+            response = self.vlm.invoke(messages)
+            
+            # 返回内容
+            return response.content
+        except Exception as e:
+            logger.error(f"处理base64图像时出错: {str(e)}")
+            raise ImageProcessorError(f"处理base64图像时出错: {str(e)}")
     
     def process_image_bytes(self, image_bytes: bytes) -> str:
         """
@@ -190,12 +290,27 @@ class ImageProcessor:
             
         Returns:
             提取的文本内容
+            
+        Raises:
+            ImageSizeExceededError: 图像大小超出限制
+            ImageProcessorError: 图像处理错误
         """
-        # 检测图像类型
-        mime_type = self._detect_image_type(image_bytes=image_bytes)
+        # 检查图片大小
+        if len(image_bytes) > self.max_image_size:
+            logger.error(f"图片大小({len(image_bytes)}字节)超过限制({self.max_image_size}字节)")
+            raise ImageSizeExceededError(
+                f"图片大小({len(image_bytes)}字节)超过限制({self.max_image_size}字节)"
+            )
         
-        # 编码图像
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        
-        # 调用VLM提取文本
-        return self.process_image_base64(base64_image, mime_type) 
+        try:
+            # 检测图像类型
+            mime_type = self._detect_image_type_from_bytes(image_bytes[:8])
+            
+            # 编码图像
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # 调用VLM提取文本
+            return self.process_image_base64(base64_image, mime_type)
+        except Exception as e:
+            logger.error(f"处理图像字节数据时出错: {str(e)}")
+            raise ImageProcessorError(f"处理图像字节数据时出错: {str(e)}") 
