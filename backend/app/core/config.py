@@ -49,6 +49,22 @@ class Settings(BaseSettings):
     # LangSmith配置
     LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "false")
     LANGCHAIN_API_KEY: str = os.getenv("LANGCHAIN_API_KEY", "")
+    LANGSMITH_TRACING: str = os.getenv("LANGSMITH_TRACING", "false")
+    LANGSMITH_API_KEY: str = os.getenv("LANGSMITH_API_KEY", "")
+    
+    # OpenAI格式配置
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_BASE: str = os.getenv("OPENAI_API_BASE", "")
+    OPENAI_LLM_MODEL: str = os.getenv("OPENAI_LLM_MODEL", "")
+    OPENAI_EMBEDDING_MODEL: str = os.getenv("OPENAI_EMBEDDING_MODEL", "")
+    OPENAI_VLM_MODEL: str = os.getenv("OPENAI_VLM_MODEL", "")
+    
+    # 服务设置
+    DEBUG: str = os.getenv("DEBUG", "false")
+    WORKERS: str = os.getenv("WORKERS", "4")
+    API_PORT: str = os.getenv("API_PORT", "8000")
+    API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "uploads")
     
     # CORS配置
     BACKEND_CORS_ORIGINS: List[str] = [
