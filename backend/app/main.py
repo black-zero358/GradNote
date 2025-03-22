@@ -7,6 +7,7 @@ from app.api.routes.api import api_router
 from app.core.config import settings
 from app.db.create_tables import create_tables
 from app.db.init_db import init_db
+from app.db.create_index import create_indexes
 from app.db.session import SessionLocal
 
 # 加载环境变量
@@ -36,6 +37,10 @@ async def startup_db_client():
     """应用启动时创建数据库表并初始化数据"""
     # 创建所有表
     create_tables()
+    
+    # 创建数据库索引
+    create_indexes()
+    
     # 初始化数据库数据
     db = SessionLocal()
     try:

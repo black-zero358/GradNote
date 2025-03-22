@@ -1,5 +1,5 @@
-from pydantic import BaseModel
 from typing import Optional, List
+from pydantic import BaseModel
 from datetime import datetime
 
 class KnowledgePointBase(BaseModel):
@@ -18,6 +18,7 @@ class KnowledgePointUpdate(BaseModel):
     section: Optional[str] = None
     item: Optional[str] = None
     details: Optional[str] = None
+    mark_count: Optional[int] = None
 
 class KnowledgePoint(KnowledgePointBase):
     id: int
@@ -25,7 +26,22 @@ class KnowledgePoint(KnowledgePointBase):
     created_at: datetime
     
     class Config:
+        orm_mode = True
         from_attributes = True
+
+class KnowledgePointSearch(BaseModel):
+    subject: Optional[str] = None
+    chapter: Optional[str] = None
+    section: Optional[str] = None
+    item: Optional[str] = None
+    sort_by: Optional[str] = None
+    skip: Optional[int] = 0
+    limit: Optional[int] = 100
+
+class KnowledgeStructure(BaseModel):
+    subject: str
+    chapter: Optional[str] = None
+    section: Optional[str] = None
 
 class MarkCreate(BaseModel):
     knowledge_point_id: int
