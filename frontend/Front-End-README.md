@@ -1,4 +1,3 @@
-
 # GradNote前端项目技术文档
 
 ## 1. 项目概述
@@ -622,8 +621,812 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 ```
 
-## 13. 结语
+## 13. 认证机制与路由保护
 
-本文档详细阐述了GradNote前端项目的技术架构和实现方案，遵循React和Next.js的最佳实践。通过采用现代化的技术栈和架构设计，项目能够提供高效、响应式的用户体验，同时保持代码的可维护性和扩展性。
+### 认证中间件
+```tsx
+// middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get('auth-token')?.value;
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/(auth)');
+  const isDashboardRoute = request.nextUrl.pathname.startsWith('/(dashboard)');
+  
+  // 未登录用户访问仪表盘，重定向到登录页
+  if (isDashboardRoute && !token) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+  
+  // 已登录用户访问登录/注册页，重定向到仪表盘
+  if (isAuthRoute && token) {
+    return NextResponse.redirect(new URL('/questions', request.url));
+  }
+  
+  return NextResponse.next();
+}
+
+// 指定匹配的路由
+export const config = {
+  matcher: ['/(dashboard)/:path*', '/(auth)/:path*'],
+};
+```
+
+### 客户端路由保护
+```tsx
+// components/AuthGuard.tsx
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/store/authStore';
+
+interface AuthGuardProps {
+  children: React.ReactNode;
+}
+
+export function AuthGuard({ children }: AuthGuardProps) {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const router = useRouter();
+  
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
+  
+  if (!isAuthenticated) {
+    return <div className="flex justify-center items-center h-screen">正在验证身份...</div>;
+  }
+  
+  return <>{children}</>;
+}
+```
+
+### 布局组件中集成认证保护
+```tsx
+// app/(dashboard)/layout.tsx - 添加路由保护
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Header } from '@/components/layout/Header';
+import { AuthGuard } from '@/components/AuthGuard';
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard>
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 overflow-y-auto p-4">{children}</main>
+        </div>
+      </div>
+    </AuthGuard>
+  );
+}
+```
+
+## 14. 错误处理
+
+### 错误边界组件
+```tsx
+// components/ErrorBoundary.tsx
+'use client';
+
+import { Component, ErrorInfo, ReactNode } from 'react';
+
+interface ErrorBoundaryProps {
+  fallback: ReactNode;
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+  
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('错误边界捕获到错误:', error, errorInfo);
+    // 此处可以添加错误日志上报逻辑
+  }
+  
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    
+    return this.props.children;
+  }
+}
+```
+
+### 通用错误提示组件
+```tsx
+// components/ui/ErrorMessage.tsx
+interface ErrorMessageProps {
+  message: string;
+  className?: string;
+}
+
+export function ErrorMessage({ message, className = '' }: ErrorMessageProps) {
+  if (!message) return null;
+  
+  return (
+    <div className={`bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm ${className}`}>
+      {message}
+    </div>
+  );
+}
+```
+
+### API错误处理Hook
+```tsx
+// lib/hooks/useApiError.ts
+import { useState, useCallback } from 'react';
+import { AxiosError } from 'axios';
+
+interface ApiError {
+  message: string;
+  field?: string;
+}
+
+export function useApiError() {
+  const [error, setError] = useState<ApiError | null>(null);
+  
+  const handleError = useCallback((err: unknown) => {
+    if (err instanceof AxiosError) {
+      const responseData = err.response?.data;
+      
+      if (responseData?.detail) {
+        // FastAPI错误格式
+        setError({ 
+          message: typeof responseData.detail === 'string' 
+            ? responseData.detail 
+            : '请求失败，请稍后重试' 
+        });
+      } else if (responseData?.message) {
+        // 自定义错误格式
+        setError({ 
+          message: responseData.message,
+          field: responseData.field 
+        });
+      } else {
+        // 默认错误信息
+        setError({ message: '网络错误，请检查网络连接' });
+      }
+    } else if (err instanceof Error) {
+      setError({ message: err.message });
+    } else {
+      setError({ message: '发生未知错误' });
+    }
+  }, []);
+  
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+  
+  return { error, handleError, clearError };
+}
+```
+
+### 与React Query集成
+```tsx
+// lib/hooks/useQuestions.ts - 改进版本
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QuestionsService, CreateQuestionRequest } from '@/lib/api/generated';
+import { useApiError } from './useApiError';
+
+export function useSubmitQuestion() {
+  const queryClient = useQueryClient();
+  const { handleError } = useApiError();
+  
+  return useMutation({
+    mutationFn: (data: CreateQuestionRequest) => QuestionsService.createQuestion(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['questions'] });
+    },
+    onError: (error) => {
+      handleError(error);
+    }
+  });
+}
+```
+
+## 15. 测试策略
+
+### Jest与React Testing Library配置
+在`package.json`中添加测试依赖和脚本:
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.0.0",
+    "jest": "^29.6.0",
+    "jest-environment-jsdom": "^29.6.0",
+    "@types/jest": "^29.5.0"
+  }
+}
+```
+
+配置Jest:
+```javascript
+// jest.config.js
+const nextJest = require('next/jest');
+
+const createJestConfig = nextJest({
+  dir: './',
+});
+
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testEnvironment: 'jest-environment-jsdom',
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  collectCoverageFrom: [
+    'app/**/*.{js,jsx,ts,tsx}',
+    'components/**/*.{js,jsx,ts,tsx}',
+    'lib/**/*.{js,jsx,ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+  ],
+};
+
+module.exports = createJestConfig(customJestConfig);
+```
+
+设置Jest:
+```javascript
+// jest.setup.js
+import '@testing-library/jest-dom';
+```
+
+### 组件单元测试示例
+```tsx
+// components/ui/Button.test.tsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Button } from './Button';
+
+describe('Button组件', () => {
+  test('渲染按钮文本', () => {
+    render(<Button>测试按钮</Button>);
+    expect(screen.getByText('测试按钮')).toBeInTheDocument();
+  });
+  
+  test('点击按钮触发onClick事件', async () => {
+    const handleClick = jest.fn();
+    render(<Button onClick={handleClick}>点击我</Button>);
+    
+    await userEvent.click(screen.getByText('点击我'));
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+  
+  test('禁用状态下按钮不可点击', async () => {
+    const handleClick = jest.fn();
+    render(<Button disabled onClick={handleClick}>禁用按钮</Button>);
+    
+    await userEvent.click(screen.getByText('禁用按钮'));
+    expect(handleClick).not.toHaveBeenCalled();
+  });
+  
+  test('应用正确的样式类', () => {
+    const { rerender } = render(<Button variant="primary">主要按钮</Button>);
+    expect(screen.getByText('主要按钮')).toHaveClass('bg-primary-600');
+    
+    rerender(<Button variant="secondary">次要按钮</Button>);
+    expect(screen.getByText('次要按钮')).toHaveClass('bg-gray-200');
+    
+    rerender(<Button variant="outline">轮廓按钮</Button>);
+    expect(screen.getByText('轮廓按钮')).toHaveClass('border-gray-300');
+  });
+});
+```
+
+### API调用测试示例
+```tsx
+// lib/api/knowledge.test.ts
+import { searchKnowledgePoints, markKnowledgePoint } from './knowledge';
+import apiClient from './client';
+
+// 模拟apiClient
+jest.mock('./client', () => ({
+  get: jest.fn(),
+  post: jest.fn(),
+}));
+
+describe('知识点API', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+  
+  test('searchKnowledgePoints发送正确的请求', async () => {
+    const mockResponse = { data: [{ id: 1, item: '测试知识点' }] };
+    (apiClient.get as jest.Mock).mockResolvedValueOnce(mockResponse);
+    
+    await searchKnowledgePoints('数学', '函数', '导数');
+    
+    expect(apiClient.get).toHaveBeenCalledWith('/knowledge/search', {
+      params: { subject: '数学', chapter: '函数', section: '导数', item: undefined }
+    });
+  });
+  
+  test('markKnowledgePoint发送正确的请求', async () => {
+    const mockResponse = { data: { success: true } };
+    (apiClient.post as jest.Mock).mockResolvedValueOnce(mockResponse);
+    
+    await markKnowledgePoint(1, 2);
+    
+    expect(apiClient.post).toHaveBeenCalledWith('/knowledge/user-mark', {
+      knowledge_point_id: 1,
+      question_id: 2
+    });
+  });
+});
+```
+
+## 16. 性能监控
+
+### Next.js内置性能分析工具
+在`next.config.js`中启用分析功能:
+```javascript
+// next.config.js
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  // 其他配置...
+};
+
+module.exports = withBundleAnalyzer(nextConfig);
+```
+
+添加脚本到`package.json`:
+```json
+"scripts": {
+  "analyze": "ANALYZE=true next build",
+  "analyze:server": "ANALYZE=true BUNDLE_ANALYZE=server next build",
+  "analyze:browser": "ANALYZE=true BUNDLE_ANALYZE=browser next build"
+}
+```
+
+### Web Vitals监控
+```tsx
+// lib/utils/vitals.ts
+import { CLSMetric, FCPMetric, FIDMetric, LCPMetric, TTFBMetric } from 'web-vitals';
+
+type MetricType = CLSMetric | FCPMetric | FIDMetric | LCPMetric | TTFBMetric;
+
+const reportWebVitals = (metric: MetricType) => {
+  // 开发环境下打印到控制台
+  if (process.env.NODE_ENV === 'development') {
+    console.log(metric);
+  }
+  
+  // 发送到分析服务
+  const body = {
+    name: metric.name,
+    value: metric.value,
+    id: metric.id,
+    startTime: metric.startTime,
+    label: metric.label,
+  };
+  
+  fetch('/api/vitals', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+};
+
+export default reportWebVitals;
+```
+
+在根布局中添加监控:
+```tsx
+// app/layout.tsx
+import { useReportWebVitals } from 'next/web-vitals';
+import reportWebVitals from '@/lib/utils/vitals';
+
+export function RootLayout({ children }: { children: React.ReactNode }) {
+  useReportWebVitals(reportWebVitals);
+  
+  return (
+    <html lang="zh-CN">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+### 实时监控解决方案
+集成Sentry用于错误跟踪和性能监控:
+
+安装Sentry:
+```bash
+npm install @sentry/nextjs
+```
+
+创建Sentry配置文件:
+```javascript
+// sentry.server.config.js
+import * as Sentry from '@sentry/nextjs';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV
+});
+
+// sentry.client.config.js
+import * as Sentry from '@sentry/nextjs';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV
+});
+
+// sentry.edge.config.js
+import * as Sentry from '@sentry/nextjs';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV
+});
+```
+
+修改`next.config.js`以启用Sentry:
+```javascript
+// next.config.js
+const { withSentryConfig } = require('@sentry/nextjs');
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // 你的配置...
+};
+
+const sentryWebpackPluginOptions = {
+  silent: true,
+};
+
+module.exports = withSentryConfig(
+  nextConfig,
+  sentryWebpackPluginOptions
+);
+```
+
+## 17. 移动端适配
+
+### 响应式设计策略
+
+#### 移动优先设计
+基于Tailwind CSS采用移动优先的设计方法:
+```tsx
+// components/layout/Sidebar.tsx - 响应式侧边栏
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { Menu, X } from 'lucide-react';
+
+export function Sidebar() {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const toggleSidebar = () => {
+    setIsOpen(!isOpen);
+  };
+  
+  return (
+    <>
+      {/* 移动端菜单按钮 */}
+      <button 
+        onClick={toggleSidebar}
+        className="fixed z-50 bottom-4 right-4 p-3 rounded-full bg-primary-600 text-white shadow-lg md:hidden"
+      >
+        {isOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+      
+      {/* 侧边栏 - 在移动端为抽屉样式，桌面端为固定侧边栏 */}
+      <div 
+        className={`fixed top-0 left-0 z-40 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:shadow-none
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="p-4">
+          <h2 className="text-xl font-bold">GradNote</h2>
+          <nav className="mt-8">
+            <ul className="space-y-2">
+              <li>
+                <Link href="/questions" 
+                  className="block p-2 rounded hover:bg-gray-100"
+                  onClick={() => setIsOpen(false)}
+                >
+                  错题管理
+                </Link>
+              </li>
+              <li>
+                <Link href="/knowledge" 
+                  className="block p-2 rounded hover:bg-gray-100"
+                  onClick={() => setIsOpen(false)}
+                >
+                  知识点
+                </Link>
+              </li>
+              {/* 其他菜单项 */}
+            </ul>
+          </nav>
+        </div>
+      </div>
+      
+      {/* 移动端侧边栏打开时的遮罩 */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+```
+
+#### 自定义断点配置
+在`tailwind.config.js`中添加自定义断点:
+```javascript
+// tailwind.config.js
+module.exports = {
+  content: [
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}'
+  ],
+  theme: {
+    extend: {
+      screens: {
+        'xs': '480px',    // 小型手机
+        'sm': '640px',    // 大型手机
+        'md': '768px',    // 平板
+        'lg': '1024px',   // 小型笔记本
+        'xl': '1280px',   // 大型笔记本
+        '2xl': '1536px',  // 桌面显示器
+      },
+      // 其他配置...
+    }
+  },
+  plugins: [],
+}
+```
+
+#### 响应式表格组件
+```tsx
+// components/questions/ResponsiveTable.tsx
+interface TableColumn {
+  title: string;
+  dataIndex: string;
+  render?: (value: any, record: any) => React.ReactNode;
+}
+
+interface ResponsiveTableProps {
+  columns: TableColumn[];
+  dataSource: any[];
+  rowKey: string;
+}
+
+export function ResponsiveTable({ columns, dataSource, rowKey }: ResponsiveTableProps) {
+  return (
+    <>
+      {/* 桌面端表格 - 只在md断点以上显示 */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b">
+              {columns.map((column) => (
+                <th key={column.dataIndex} className="px-4 py-2 text-left font-medium text-gray-500">
+                  {column.title}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dataSource.map((record) => (
+              <tr key={record[rowKey]} className="border-b hover:bg-gray-50">
+                {columns.map((column) => (
+                  <td key={`${record[rowKey]}-${column.dataIndex}`} className="px-4 py-3">
+                    {column.render
+                      ? column.render(record[column.dataIndex], record)
+                      : record[column.dataIndex]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
+      {/* 移动端卡片布局 - 只在小于md断点显示 */}
+      <div className="md:hidden space-y-4">
+        {dataSource.map((record) => (
+          <div key={record[rowKey]} className="bg-white rounded-lg shadow p-4">
+            {columns.map((column) => (
+              <div key={`${record[rowKey]}-${column.dataIndex}`} className="py-2">
+                <div className="text-sm font-medium text-gray-500">{column.title}</div>
+                <div>
+                  {column.render
+                    ? column.render(record[column.dataIndex], record)
+                    : record[column.dataIndex]}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+```
+
+#### 屏幕尺寸Hook
+```tsx
+// lib/hooks/useBreakpoint.ts
+'use client';
+
+import { useState, useEffect } from 'react';
+
+type Breakpoint = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+
+const breakpoints = {
+  xs: 480,
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  '2xl': 1536,
+};
+
+export function useBreakpoint(): Breakpoint {
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>('xs');
+  
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      
+      if (width >= breakpoints['2xl']) {
+        setBreakpoint('2xl');
+      } else if (width >= breakpoints.xl) {
+        setBreakpoint('xl');
+      } else if (width >= breakpoints.lg) {
+        setBreakpoint('lg');
+      } else if (width >= breakpoints.md) {
+        setBreakpoint('md');
+      } else if (width >= breakpoints.sm) {
+        setBreakpoint('sm');
+      } else {
+        setBreakpoint('xs');
+      }
+    };
+    
+    // 初始化
+    handleResize();
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  return breakpoint;
+}
+```
+
+#### 响应式布局应用示例
+```tsx
+// app/(dashboard)/questions/page.tsx - 响应式布局
+import { useBreakpoint } from '@/lib/hooks/useBreakpoint';
+import { QuestionsTable } from '@/components/questions/QuestionsTable';
+import { QuestionCards } from '@/components/questions/QuestionCards';
+
+export default function QuestionsPage() {
+  const breakpoint = useBreakpoint();
+  const isMobile = ['xs', 'sm'].includes(breakpoint);
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h1 className="text-2xl font-bold">错题列表</h1>
+        <div className="flex flex-col xs:flex-row gap-2">
+          <button className="btn-primary">添加错题</button>
+          <button className="btn-outline">导出数据</button>
+        </div>
+      </div>
+      
+      {/* 根据屏幕大小选择不同显示方式 */}
+      {isMobile ? <QuestionCards /> : <QuestionsTable />}
+    </div>
+  );
+}
+```
+
+### 触摸友好设计
+```css
+/* styles/globals.css 添加 */
+@layer utilities {
+  .touch-target {
+    @apply min-w-[44px] min-h-[44px]; /* 确保触摸目标至少44px */
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+```
+
+在组件中应用触摸友好设计:
+```tsx
+// components/ui/Button.tsx - 改进触摸体验
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline';
+  size?: 'sm' | 'md' | 'lg';
+  fullWidth?: boolean;
+}
+
+export function Button({ 
+  variant = 'primary', 
+  size = 'md', 
+  fullWidth = false,
+  className, 
+  children, 
+  ...props 
+}: ButtonProps) {
+  // ... 现有代码
+  
+  // 增加触摸友好类
+  const touchClass = size === 'sm' ? 'touch-target' : '';
+  const widthClass = fullWidth ? 'w-full' : '';
+  
+  return (
+    <button
+      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${touchClass} ${widthClass} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+```
+
+## 18. 结语
+
+本文档详细阐述了GradNote前端项目的技术架构和实现方案，遵循React和Next.js的最佳实践。通过采用现代化的技术栈和架构设计，完善的认证机制、错误处理策略、测试系统、性能监控和移动端适配，项目能够提供高效、安全、响应式的用户体验，同时保持代码的可维护性和扩展性。
 
 开发团队应遵循本文档的规范和建议，确保项目的一致性和质量。随着项目的发展，本文档将根据需要进行更新和完善。
