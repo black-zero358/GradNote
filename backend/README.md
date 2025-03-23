@@ -53,15 +53,26 @@ REDIS_PORT=6379
 
 # 安全配置
 SECRET_KEY=your-secret-key-for-production
-
-# LLM服务配置（可选）
-LLM_API_KEY=your-llm-api-key
-LLM_MODEL=deepseek-r1-250120
-VLM_MODEL=doubao-1-5-vision-pro-32k-250115
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # LangSmith配置（可选）
-LANGCHAIN_TRACING_V2=false
-LANGCHAIN_API_KEY=your-langsmith-api-key
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your-langsmith-api-key
+
+# LLM设置 (OpenAI格式)
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_API_BASE=your-openai-api-base
+OPENAI_LLM_MODEL=deepseek-r1-250120
+OPENAI_EMBEDDING_MODEL=doubao-embedding-large-text-240915
+OPENAI_VLM_MODEL=doubao-1-5-vision-pro-32k-250115
+
+# 服务设置
+DEBUG=true
+WORKERS=4
+API_PORT=8000
+API_HOST=0.0.0.0
+UPLOAD_DIR=uploads
 ```
 
 根据您的实际环境修改上述配置。
@@ -140,6 +151,32 @@ python -m app.db.create_index
 python -c "from app.db.session import SessionLocal; from app.db.init_db import init_db; db = SessionLocal(); init_db(db); db.close()"
 ```
 
+## 主要功能
+
+### 1. 用户认证
+- 用户注册和登录
+- JWT令牌认证
+
+### 2. 错题管理
+- 创建、更新、删除和查询错题
+- 支持按科目、难度等筛选错题
+- 错题图像上传和处理
+
+### 3. 知识点管理
+- 创建、更新、删除和查询知识点
+- 支持结构化查询和树形展示
+- 知识点自动标记和提取
+
+### 4. 图像处理
+- 支持多种格式图像上传（JPG、PNG、PDF等）
+- 图像格式自动识别
+- 安全的文件处理和存储
+
+### 5. AI辅助功能
+- 集成LangChain和LangGraph
+- 智能解题辅助
+- 知识点自动标记和关联
+
 ## 目录结构
 
 ```
@@ -154,6 +191,10 @@ backend/
 │   ├── models/           # SQLAlchemy模型
 │   ├── services/         # 业务逻辑
 │   └── ml/               # 机器学习相关代码
+│       ├── image_processing/  # 图像处理
+│       ├── knowledge_mark/    # 知识点标记
+│       └── solving/           # 解题辅助
+├── uploads/              # 上传文件存储
 ├── tests/                # 测试
 ├── requirements.txt      # 依赖包列表
 └── Dockerfile            # Docker配置
@@ -172,6 +213,16 @@ backend/
    - 默认用户名/密码：admin/admin
    - 登录接口：`POST /api/v1/auth/login`
    - 大多数API需要认证，请在请求头中添加Token：`Authorization: Bearer <token>`
+
+3. **文件上传问题**：
+   - 确保uploads目录存在且有写入权限
+   - 文件大小默认限制为10MB
+   - 支持的图像格式：JPG、PNG、GIF、PDF
+
+4. **LLM服务连接问题**：
+   - 检查API密钥和基础URL配置
+   - 确认网络连接正常
+   - 查看日志获取详细错误信息
 
 ### 日志
 
