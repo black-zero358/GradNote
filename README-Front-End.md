@@ -1,756 +1,806 @@
-
-# GradNote前端项目技术文档（优化版）
-
-## 目录
-
-1. [项目概述](#1-项目概述)
-2. [技术栈](#2-技术栈)
-3. [项目结构](#3-项目结构)
-4. [开发环境](#4-开发环境)
-5. [组件设计](#5-组件设计)
-6. [数据流管理](#6-数据流管理)
-7. [路由设计](#7-路由设计)
-8. [UI设计与响应式策略](#8-ui设计与响应式策略)
-9. [认证与安全](#9-认证与安全)
-10. [错误处理](#10-错误处理)
-11. [测试策略](#11-测试策略)
-12. [性能优化](#12-性能优化)
-13. [部署流程](#13-部署流程)
-14. [开发规范](#14-开发规范)
+# GradNote 前端编码文档（React + Ant Design）
 
 ## 1. 项目概述
 
-GradNote是一个错题知识点管理系统，通过智能技术帮助学习者分析错题并提取相关知识点。
+GradNote是一个错题管理和知识点追踪系统，包含错题提交、知识点审核、数据统计与可视化等功能。本文档基于后端API技术文档，优化了React与Ant Design的前端实现方案。
 
-### 核心功能
+## 2. 技术栈详情
 
-- 错题提交与管理
-- 自动知识点提取与匹配
-- 知识点标记与统计
-- 解题过程分析
-- 学习数据可视化
-
-> **技术价值**：系统整合了现代前端技术与智能分析，提供流畅的用户体验与精准的学习反馈。
-
-## 2. 技术栈
-
-| 类别 | 技术 | 版本 | 用途 |
-|------|------|------|------|
-| **核心框架** | React | 18 | UI构建基础库 |
-|  | Next.js | 14 (App Router) | SSR, 路由, API |
-| **UI与样式** | Tailwind CSS | 3.x | 原子化CSS |
-|  | Ant Design | 5.x | 数据可视化组件 |
-| **表单与文件** | React Hook Form | 7.x | 表单处理 |
-|  | React-Dropzone | 14.x | 文件上传 |
-| **状态管理** | React Context | - | 轻量级状态共享 |
-|  | Zustand | 4.x | 状态管理 |
-| **数据获取** | React Query | 4.x | 服务端状态管理 |
-|  | Axios | 1.x | HTTP客户端 |
-| **开发工具** | TypeScript | 5.x | 静态类型检查 |
-
-### 技术选择理由
-
-- **Next.js App Router**: 提供更好的SEO支持和性能优化
-- **Zustand**: 相比Redux更轻量且简洁，学习曲线平缓
-- **React Query**: 简化数据获取和缓存管理，减少模板代码
+- **核心框架**：React 18
+- **UI组件库**：Ant Design 5.x
+- **状态管理**：Redux Toolkit + React Query
+- **路由管理**：React Router 6
+- **HTTP请求**：Axios
+- **图表可视化**：AntV/G2Plot
+- **表单处理**：Formik/React Hook Form
+- **开发语言**：TypeScript
+- **构建工具**：Vite
+- **CSS预处理**：Less（Ant Design原生支持）
+- **代码规范**：ESLint + Prettier
+- **测试工具**：Jest + React Testing Library
 
 ## 3. 项目结构
 
 ```
-/
-├── app/                      # Next.js App Router
-│   ├── layout.tsx            # 根布局组件
-│   ├── page.tsx              # 首页
-│   ├── (auth)/               # 认证相关路由组
-│   ├── (dashboard)/          # 主功能路由组
-│   └── api/                  # API路由
-├── components/               # 共享组件
-│   ├── ui/                   # UI基础组件
-│   ├── forms/                # 表单相关组件
-│   ├── questions/            # 错题相关组件
-│   ├── knowledge/            # 知识点相关组件
-│   └── layout/               # 布局组件
-├── lib/                      # 工具函数和库
-│   ├── api/                  # API集成
-│   ├── hooks/                # 自定义Hooks
-│   ├── store/                # 状态管理
-│   └── utils/                # 工具函数
-└── public/                   # 静态资源
+src/
+├── api/               # API请求封装
+│   ├── auth.ts        # 认证相关API
+│   ├── questions.ts   # 错题相关API
+│   ├── knowledge.ts   # 知识点相关API
+│   ├── solving.ts     # 解题相关API
+│   └── image.ts       # 图像处理API
+├── assets/            # 静态资源文件
+├── components/        # 通用组件
+│   ├── common/        # 公共基础组件
+│   ├── layout/        # 布局组件
+│   └── business/      # 业务组件
+├── hooks/             # 自定义Hooks
+├── pages/             # 页面组件
+│   ├── Auth/          # 登录注册页面
+│   ├── Dashboard/     # 仪表盘
+│   ├── ErrorManage/   # 错题管理
+│   ├── KnowledgeBase/ # 知识点库
+│   └── Solving/       # 解题页面
+├── router/            # 路由配置
+├── store/             # Redux状态管理
+│   ├── slices/        # Redux切片
+│   └── index.ts       # 存储配置
+├── styles/            # 全局样式
+├── types/             # TypeScript类型定义
+├── utils/             # 工具函数
+├── App.tsx            # 应用入口组件
+├── main.tsx           # 应用渲染入口
+└── vite-env.d.ts      # Vite类型声明
 ```
 
-> **最佳实践**：按功能域而非技术类型组织文件，提高相关代码的内聚性。
+## 4. 组件设计
 
-## 4. 开发环境
+### 4.1 核心业务组件
 
-### 快速启动
+#### 错题管理组件
+- **ErrorSubmitForm**：错题提交表单，支持直接输入和图片上传
+- **ErrorImageUploader**：错题图片上传组件，集成OCR识别
+- **ErrorProcessingFlow**：错题处理流程展示组件
+- **ErrorDetailView**：错题详情查看组件
+- **ErrorTable**：错题列表表格，支持筛选、排序和分页
 
-```bash
-# 创建项目
-npx create-next-app@latest gradnote --typescript --eslint --tailwind --app
+#### 知识点管理组件
+- **KnowledgeStructureTree**：知识点结构树，基于科目-章节-小节层级展示
+- **KnowledgeSearch**：知识点搜索组件
+- **KnowledgePointCard**：知识点卡片，展示知识点详情
+- **KnowledgeMarkButton**：知识点标记按钮
+- **PopularKnowledgeList**：热门知识点列表
 
-# 安装依赖
-npm install antd @ant-design/charts react-hook-form react-dropzone zustand @tanstack/react-query axios
-```
+#### 解题组件
+- **SolutionEditor**：解题编辑器，提供解题记录功能
+- **KnowledgeExtractor**：从错题提取知识点的组件
+- **SolutionReview**：解题复习组件
 
-### API类型生成
+#### 数据可视化组件
+- **KnowledgeDistributionChart**：知识点分布图表
+- **ErrorStatisticsChart**：错题统计图表
+- **LearningProgressChart**：学习进度图表
 
-在`package.json`中添加:
+### 4.2 布局组件
 
-```json
-"scripts": {
-  // ...其他脚本
-  "generate-api": "openapi --input http://localhost:8000/openapi.json --output lib/api/generated --client axios"
-}
-```
+- **MainLayout**：主布局，包含侧边菜单、顶部导航和内容区
+- **SideMenu**：侧边菜单组件，根据用户权限动态生成
+- **HeaderNav**：顶部导航栏，包含用户信息、通知等
 
-> **提示**：首次设置完成后，每当后端API变更时运行`npm run generate-api`更新类型定义。
+### 4.3 通用组件
 
-## 5. 组件设计
+- **ImageUploader**：图片上传组件，支持预览和删除
+- **StatusFlow**：状态流程组件，用于展示处理流程
+- **FilterPanel**：筛选面板，用于列表页面的条件筛选
+- **ChartCard**：图表卡片组件，封装统一的图表展示样式
+- **TokenManager**：JWT令牌管理组件，处理认证相关功能
 
-### 核心组件架构
+## 5. 数据流管理
 
-![组件架构](https://placeholder-for-component-architecture.png)
+### 5.1 Redux状态设计
 
-### 关键组件示例
+根据后端API结构设计状态切片：
 
-#### 错题提交组件
-
-```tsx
-// components/questions/QuestionForm.tsx
-import { useForm } from 'react-hook-form';
-import { useDropzone } from 'react-dropzone';
-import { useSubmitQuestion } from '@/lib/hooks/useQuestions';
-
-export function QuestionForm() {
-  const { register, handleSubmit } = useForm();
-  const { mutate, isLoading } = useSubmitQuestion();
-  const { getRootProps, getInputProps } = useDropzone({
-    accept: {'image/*': []},
-    // ...配置
-  });
-  
-  // 处理逻辑...
-  
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      {/* 表单字段 */}
-      <div {...getRootProps()} className="border-2 border-dashed p-4">
-        <input {...getInputProps()} />
-        <p>拖放题目图片或点击上传</p>
-      </div>
-      <button type="submit" disabled={isLoading}>
-        {isLoading ? '提交中...' : '提交错题'}
-      </button>
-    </form>
-  );
-}
-```
-
-#### 组件设计原则
-
-- **单一职责**：每个组件专注于特定功能
-- **组合优先**：通过组合而非继承扩展功能
-- **状态下移**：将状态尽可能保持在低层级组件中
-- **声明式设计**：使用hooks封装业务逻辑
-
-### 章节要点
-
-- ✅ 采用组件化设计提高代码复用性
-- ✅ 使用自定义hooks分离业务逻辑和UI
-- ✅ 组件保持低耦合、高内聚的设计原则
-
-## 6. 数据流管理
-
-### 状态管理
-
-#### Zustand状态存储
-
-```tsx
-// lib/store/authStore.ts
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-interface AuthState {
-  token: string | null;
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (token: string, user: User) => void;
-  logout: () => void;
-}
-
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      token: null,
-      user: null,
-      isAuthenticated: false,
-      login: (token, user) => set({ token, user, isAuthenticated: true }),
-      logout: () => set({ token: null, user: null, isAuthenticated: false }),
-    }),
-    { name: 'auth-storage' }
-  )
-);
-```
-
-### API集成
-
-#### React Query数据获取
-
-```tsx
-// lib/hooks/useQuestions.ts
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { QuestionsService } from '@/lib/api/generated';
-
-export function useQuestions(skip = 0, limit = 10) {
-  return useQuery(['questions', skip, limit], () => 
-    QuestionsService.getQuestions(skip, limit)
-  );
-}
-
-export function useSubmitQuestion() {
-  const queryClient = useQueryClient();
-  
-  return useMutation(
-    (data) => QuestionsService.createQuestion(data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['questions']);
-      },
+- **auth/slice**：认证和用户信息
+  ```mermaid
+classDiagram
+    class AuthState {
+        +User user
+        +string token
+        +boolean isAuthenticated
+        +boolean loading
+        +string error
     }
-  );
+    
+    class User {
+        +number id
+        +string username
+        +string email
+    }
+    
+    class QuestionsState {
+        +Question[] questions
+        +Question currentQuestion
+        +boolean loading
+        +string error
+        +Filters filters
+    }
+    
+    class Filters {
+        +number skip
+        +number limit
+        +string search
+    }
+    
+    class KnowledgeState {
+        +KnowledgePoint[] knowledgePoints
+        +KnowledgePoint currentKnowledgePoint
+        +UserMark[] userMarks
+        +string[] subjects
+        +Record~string,string[]~ chapters
+        +Record~string,Record~string,string[]~~ sections
+        +KnowledgePoint[] popularPoints
+        +boolean loading
+        +string error
+    }
+    
+    class SolvingState {
+        +Solution currentSolution
+        +KnowledgePoint[] extractedKnowledgePoints
+        +boolean loading
+        +string error
+    }
+    
+    AuthState *-- User
+    QuestionsState *-- Filters
+  ```
+
+### 5.2 React Query集成
+
+为高效处理数据获取、缓存和同步，集成React Query：
+
+```mermaid
+sequenceDiagram
+    participant Component
+    participant ReactQuery
+    participant API
+    participant Server
+    
+    Component->>ReactQuery: useQuestions(skip, limit)
+    ReactQuery->>ReactQuery: Check cache
+    
+    alt Cache miss or stale
+        ReactQuery->>API: api.questions.getQuestions(skip, limit)
+        API->>Server: GET /api/v1/questions/?skip=X&limit=Y
+        Server->>API: Return questions data
+        API->>ReactQuery: Return response
+        ReactQuery->>ReactQuery: Cache response
+    end
+    
+    ReactQuery->>Component: Return {data, isLoading, error}
+    
+    Component->>ReactQuery: useKnowledgePoints(params)
+    ReactQuery->>ReactQuery: Check cache
+    
+    alt Cache miss or stale
+        ReactQuery->>API: api.knowledge.searchKnowledgePoints(params)
+        API->>Server: GET /api/v1/knowledge/search
+        Server->>API: Return knowledge points
+        API->>ReactQuery: Return response
+        ReactQuery->>ReactQuery: Cache response
+    end
+    
+    ReactQuery->>Component: Return {data, isLoading, error}
+```
+
+## 6. API服务封装
+
+基于后端API文档，设计对应的前端API服务：
+
+### 6.1 认证服务
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AuthAPI
+    participant Server
+    
+    Client->>AuthAPI: login(username, password)
+    AuthAPI->>Server: POST /api/v1/auth/login {username, password}
+    Server->>AuthAPI: Return token & user data
+    AuthAPI->>Client: Return response
+    
+    Client->>AuthAPI: register(userData)
+    AuthAPI->>Server: POST /api/v1/auth/register {userData}
+    Server->>AuthAPI: Return success/error
+    AuthAPI->>Client: Return response
+```
+
+### 6.2 错题服务
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant QuestionsAPI
+    participant Server
+    
+    Client->>QuestionsAPI: createQuestion(data)
+    QuestionsAPI->>Server: POST /api/v1/questions/ {data}
+    Server->>QuestionsAPI: Return created question
+    QuestionsAPI->>Client: Return response
+    
+    Client->>QuestionsAPI: getQuestions(skip, limit)
+    QuestionsAPI->>Server: GET /api/v1/questions/?skip=X&limit=Y
+    Server->>QuestionsAPI: Return questions list
+    QuestionsAPI->>Client: Return response
+    
+    Client->>QuestionsAPI: createFromImage(file)
+    QuestionsAPI->>QuestionsAPI: Create FormData
+    QuestionsAPI->>Server: POST /api/v1/questions/from-image {formData}
+    Server->>QuestionsAPI: Return extracted question
+    QuestionsAPI->>Client: Return response
+```
+
+### 6.3 知识点服务
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant KnowledgeAPI
+    participant Server
+    
+    Client->>KnowledgeAPI: getByStructure(subject, chapter, section)
+    KnowledgeAPI->>Server: GET /api/v1/knowledge/structure {params}
+    Server->>KnowledgeAPI: Return knowledge points
+    KnowledgeAPI->>Client: Return response
+    
+    Client->>KnowledgeAPI: search(params)
+    KnowledgeAPI->>Server: GET /api/v1/knowledge/search {params}
+    Server->>KnowledgeAPI: Return search results
+    KnowledgeAPI->>Client: Return response
+    
+    Client->>KnowledgeAPI: markKnowledgePoint(id)
+    KnowledgeAPI->>Server: POST /api/v1/knowledge/mark/{id}
+    Server->>KnowledgeAPI: Return success/error
+    KnowledgeAPI->>Client: Return response
+```
+
+### 6.4 解题服务
+
+```typescript
+// api/solving.ts
+export const solvingAPI = {
+  solveQuestion: (questionId: number) => 
+    axios.post(`/api/v1/solving/${questionId}`),
+  
+  extractKnowledgePoints: (questionId: number) => 
+    axios.post(`/api/v1/solving/extract/${questionId}`)
 }
 ```
 
-### 数据流向图
+### 6.5 图像处理服务
 
-![数据流向图](https://placeholder-for-data-flow.png)
-
-> **最佳实践**：使用React Query管理服务端状态，Zustand管理客户端状态，明确分离关注点。
-
-### 章节要点
-
-- ✅ API接口自动生成TypeScript类型，确保类型安全
-- ✅ 服务端状态与客户端状态分离管理
-- ✅ 缓存策略优化数据加载性能
+```typescript
+// api/image.ts
+export const imageAPI = {
+  processImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post('/api/v1/image/process', formData);
+  }
+}
+```
 
 ## 7. 路由设计
 
-### Next.js App Router结构
+基于API功能和页面需求，优化路由结构：
 
-| 路由路径 | 组件文件 | 功能描述 |
-|---------|---------|---------|
-| `/` | app/page.tsx | 首页 |
-| `/login` | app/(auth)/login/page.tsx | 登录页 |
-| `/register` | app/(auth)/register/page.tsx | 注册页 |
-| `/questions` | app/(dashboard)/questions/page.tsx | 错题列表 |
-| `/questions/[id]` | app/(dashboard)/questions/[id]/page.tsx | 错题详情 |
-| `/knowledge` | app/(dashboard)/knowledge/page.tsx | 知识点管理 |
-
-### 布局组件
-
-```tsx
-// app/(dashboard)/layout.tsx
-import { Sidebar } from '@/components/layout/Sidebar';
-import { Header } from '@/components/layout/Header';
-
-export default function DashboardLayout({ children }) {
-  return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-}
+```typescript
+// router/index.tsx
+const routes = [
+  {
+    path: '/',
+    element: <MainLayout />,
+    children: [
+      { path: '/', element: <Dashboard /> },
+      { path: '/login', element: <Login /> },
+      { path: '/register', element: <Register /> },
+      
+      // 错题管理路由
+      { path: '/questions', element: <QuestionList /> },
+      { path: '/questions/new', element: <QuestionCreate /> },
+      { path: '/questions/:id', element: <QuestionDetail /> },
+      { path: '/questions/:id/edit', element: <QuestionEdit /> },
+      { path: '/questions/image-upload', element: <ImageUploadQuestion /> },
+      
+      // 知识点管理路由
+      { path: '/knowledge', element: <KnowledgeList /> },
+      { path: '/knowledge/subjects/:subject', element: <SubjectView /> },
+      { path: '/knowledge/search', element: <KnowledgeSearch /> },
+      { path: '/knowledge/popular', element: <PopularKnowledge /> },
+      { path: '/knowledge/:id', element: <KnowledgeDetail /> },
+      { path: '/knowledge/user-marks', element: <UserMarks /> },
+      
+      // 解题路由
+      { path: '/solve/:questionId', element: <SolveQuestion /> },
+      { path: '/extract/:questionId', element: <ExtractKnowledge /> },
+      
+      // 用户设置
+      { path: '/settings', element: <UserSettings /> },
+    ]
+  }
+];
 ```
 
-> **注意**：路由组结构(`auth`, `dashboard`)用于共享布局而不影响URL路径。
+## 8. 认证与权限控制
 
-### 章节要点
+### 8.1 JWT认证流程
 
-- ✅ 使用App Router提供更好的布局嵌套和加载状态
-- ✅ 采用路由组隔离不同功能区域
-- ✅ 页面组件专注于数据获取和展示
+基于后端Bearer Token认证机制：
 
-## 8. UI设计与响应式策略
-
-### 样式方案
-
-#### Tailwind实用工具类
-
-```css
-/* styles/globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer components {
-  .card {
-    @apply bg-white rounded-lg shadow p-4;
-  }
-  
-  .btn-primary {
-    @apply px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 
-    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
-  }
-}
-```
-
-### 响应式设计
-
-#### 断点配置
-
-```js
-// tailwind.config.js
-module.exports = {
-  theme: {
-    extend: {
-      screens: {
-        'xs': '480px',    // 小型手机
-        'sm': '640px',    // 大型手机
-        'md': '768px',    // 平板
-        'lg': '1024px',   // 笔记本
-        'xl': '1280px',   // 桌面
-      },
-    }
-  },
-}
-```
-
-#### 响应式组件示例
-
-```tsx
-// components/layout/ResponsiveSidebar.tsx
-'use client';
-
-import { useState } from 'react';
-import { useBreakpoint } from '@/lib/hooks/useBreakpoint';
-
-export function ResponsiveSidebar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const breakpoint = useBreakpoint();
-  const isMobile = ['xs', 'sm'].includes(breakpoint);
-  
-  // 根据断点渲染不同的侧边栏
-  return isMobile ? (
-    <MobileSidebar isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
-  ) : (
-    <DesktopSidebar />
-  );
-}
-```
-
-### 移动端优化
-
-- **触摸友好设计**：所有交互元素最小44x44px
-- **自适应布局**：从卡片视图到表格视图的响应式转换
-- **安全区域适配**：使用`env(safe-area-inset-*)`确保全面屏设备显示正常
-
-> **设计原则**：始终采用移动优先的设计方法，再向上扩展到桌面视图。
-
-### 章节要点
-
-- ✅ Tailwind提供一致的设计系统和原子化CSS
-- ✅ 响应式设计确保跨设备良好体验
-- ✅ 触摸优化改善移动端用户交互
-
-## 9. 认证与安全
-
-### 认证流程
-
-![认证流程图](https://placeholder-for-auth-flow.png)
-
-### 路由保护
-
-```tsx
-// middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('auth-token')?.value;
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/(auth)');
-  const isDashboardRoute = request.nextUrl.pathname.startsWith('/(dashboard)');
-  
-  // 未登录用户访问仪表盘，重定向到登录页
-  if (isDashboardRoute && !token) {
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-  
-  // 已登录用户访问登录/注册页，重定向到仪表盘
-  if (isAuthRoute && token) {
-    return NextResponse.redirect(new URL('/questions', request.url));
-  }
-  
-  return NextResponse.next();
-}
-```
-
-### 客户端权限控制
-
-```tsx
-// components/AuthGuard.tsx
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/store/authStore';
-
-export function AuthGuard({ children }) {
-  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
-  const router = useRouter();
-  
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, router]);
-  
-  return isAuthenticated ? <>{children}</> : <Loading />;
-}
-```
-
-> **安全提示**：同时在中间件和客户端实现认证检查，确保双重保护。
-
-### 章节要点
-
-- ✅ 完整的认证流程保护敏感数据
-- ✅ 使用中间件实现路由级别保护
-- ✅ 客户端组件提供额外的权限控制层
-
-## 10. 错误处理
-
-### 错误边界
-
-```tsx
-// components/ErrorBoundary.tsx
-'use client';
-
-import { Component, ErrorInfo, ReactNode } from 'react';
-
-interface Props {
-  fallback: ReactNode;
-  children: ReactNode;
-}
-
-interface State {
-  hasError: boolean;
-  error: Error | null;
-}
-
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
-  }
-  
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('错误边界捕获错误:', error, errorInfo);
-    // 错误日志上报
-  }
-  
-  render(): ReactNode {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AxiosInterceptor
+    participant Server
     
-    return this.props.children;
-  }
-}
-```
-
-### API错误处理
-
-```tsx
-// lib/hooks/useApiError.ts
-import { useState, useCallback } from 'react';
-import { AxiosError } from 'axios';
-
-export function useApiError() {
-  const [error, setError] = useState(null);
-  
-  const handleError = useCallback((err) => {
-    if (err instanceof AxiosError) {
-      // 处理不同类型的API错误
-      // ...
-    } else {
-      setError({ message: '发生未知错误' });
-    }
-  }, []);
-  
-  return { error, handleError, clearError: () => setError(null) };
-}
-```
-
-### 错误处理策略
-
-| 错误类型 | 处理方式 | 用户体验 |
-|---------|---------|---------|
-| 网络错误 | 自动重试 + 用户通知 | 显示重试按钮 |
-| 认证错误 | 重定向到登录页 | 保存当前页面状态 |
-| 表单错误 | 内联显示错误信息 | 高亮错误字段 |
-| 服务端错误 | 错误边界捕获 | 显示友好错误页面 |
-
-> **最佳实践**：错误消息应当清晰明了，并提供恢复建议。
-
-### 章节要点
-
-- ✅ 全面的错误处理确保良好用户体验
-- ✅ 区分不同类型错误并采取相应对策
-- ✅ 使用错误边界防止整个应用崩溃
-
-## 11. 测试策略
-
-### 测试配置
-
-```json
-// package.json测试配置
-{
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
-  }
-}
-```
-
-### 测试类型与示例
-
-#### 组件测试
-
-```tsx
-// Button.test.tsx
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { Button } from './Button';
-
-describe('Button组件', () => {
-  test('渲染按钮文本', () => {
-    render(<Button>测试按钮</Button>);
-    expect(screen.getByText('测试按钮')).toBeInTheDocument();
-  });
-  
-  test('点击按钮触发onClick事件', async () => {
-    const handleClick = jest.fn();
-    render(<Button onClick={handleClick}>点击我</Button>);
+    Note over Client,Server: 请求拦截
+    Client->>AxiosInterceptor: 发起API请求
+    AxiosInterceptor->>AxiosInterceptor: 获取本地存储token
     
-    await userEvent.click(screen.getByText('点击我'));
-    expect(handleClick).toHaveBeenCalledTimes(1);
-  });
-});
+    alt Token存在
+        AxiosInterceptor->>AxiosInterceptor: 添加Authorization头
+    end
+    
+    AxiosInterceptor->>Server: 发送请求
+    
+    Note over Client,Server: 响应拦截
+    Server->>AxiosInterceptor: 返回响应
+    
+    alt 响应状态码为401
+        AxiosInterceptor->>AxiosInterceptor: 清除本地token
+        AxiosInterceptor->>Client: 重定向到登录页
+    else 其他响应
+        AxiosInterceptor->>Client: 返回响应数据
+    end
 ```
 
-#### API调用测试
+### 8.2 权限控制组件
 
-```tsx
-// knowledge.test.ts
-import { searchKnowledgePoints } from './knowledge';
-import apiClient from './client';
-
-jest.mock('./client');
-
-describe('知识点API', () => {
-  test('searchKnowledgePoints发送正确的请求', async () => {
-    // 测试代码...
-  });
-});
+```mermaid
+flowchart TD
+    A[ProtectedRoute组件] --> B{是否加载中?}
+    B -- 是 --> C[显示加载状态]
+    B -- 否 --> D{用户是否已认证?}
+    D -- 是 --> E[渲染子组件]
+    D -- 否 --> F[重定向到登录页]
+    F --> G[保存原始访问路径]
 ```
 
-### 测试覆盖目标
+## 9. 核心功能实现
 
-| 层级 | 覆盖率目标 | 重点测试内容 |
-|------|----------|------------|
-| 组件 | 80% | 交互事件、UI状态变化 |
-| Hooks | 90% | 业务逻辑、状态变更 |
-| 工具函数 | 95% | 边界条件、异常处理 |
+### 9.1 错题图片上传与OCR
 
-> **提示**：优先测试核心业务逻辑和高风险代码路径。
-
-### 章节要点
-
-- ✅ 单元测试确保组件和功能的正确性
-- ✅ 模拟API调用测试数据流
-- ✅ 覆盖关键业务逻辑和用户交互流程
-
-## 12. 性能优化
-
-### 代码分割
-
-```tsx
-// 使用动态导入延迟加载大型组件
-import dynamic from 'next/dynamic';
-
-const KnowledgeChart = dynamic(
-  () => import('@/components/charts/KnowledgeChart').then(mod => mod.KnowledgeChart),
-  { loading: () => <p>加载图表中...</p> }
-);
+```mermaid
+sequenceDiagram
+    participant User
+    participant ErrorImageUploader
+    participant ImageAPI
+    participant Server
+    
+    User->>ErrorImageUploader: 选择图片
+    ErrorImageUploader->>ErrorImageUploader: 设置loading=true
+    ErrorImageUploader->>ImageAPI: processImage(file)
+    ImageAPI->>Server: POST /api/v1/image/process
+    
+    alt 请求成功
+        Server->>ImageAPI: 返回{image_url, text}
+        ImageAPI->>ErrorImageUploader: 返回处理结果
+        ErrorImageUploader->>ErrorImageUploader: setImageUrl(response.image_url)
+        ErrorImageUploader->>ErrorImageUploader: setExtractedText(response.text)
+    else 请求失败
+        Server->>ImageAPI: 返回错误
+        ImageAPI->>ErrorImageUploader: 返回错误
+        ErrorImageUploader->>User: 显示错误提示
+    end
+    
+    ErrorImageUploader->>ErrorImageUploader: 设置loading=false
+    ErrorImageUploader->>User: 显示图片和识别文本
 ```
 
-### 图像优化
+### 9.2 知识点结构化展示
 
-```tsx
-import Image from 'next/image';
-
-export function QuestionImage({ src, alt }) {
-  return (
-    <div className="relative h-48 w-full">
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        sizes="(max-width: 768px) 100vw, 50vw"
-        className="object-contain"
-      />
-    </div>
-  );
-}
+```mermaid
+flowchart TD
+    A[KnowledgeStructureTree组件] --> B[加载科目列表]
+    B --> C{科目列表加载成功?}
+    C -- 是 --> D[显示科目下拉选择器]
+    C -- 否 --> E[显示错误提示]
+    
+    D --> F{用户选择科目?}
+    F -- 是 --> G[加载所选科目的章节]
+    G --> H{章节列表加载成功?}
+    H -- 是 --> I[显示章节下拉选择器]
+    H -- 否 --> J[显示错误提示]
+    
+    I --> K{用户选择章节?}
+    K -- 是 --> L[加载所选科目和章节的知识点]
+    L --> M{知识点加载成功?}
+    M -- 是 --> N[显示知识点列表]
+    M -- 否 --> O[显示错误提示]
+    
+    N --> P{用户点击标记按钮?}
+    P -- 是 --> Q[执行标记知识点操作]
 ```
 
-### 缓存策略
+### 9.3 知识点提取
 
-```tsx
-// 配置React Query缓存
+```mermaid
+sequenceDiagram
+    participant User
+    participant KnowledgeExtractor
+    participant SolvingAPI
+    participant KnowledgeAPI
+    participant Server
+    
+    User->>KnowledgeExtractor: 点击"提取知识点"按钮
+    KnowledgeExtractor->>KnowledgeExtractor: 设置loading=true
+    KnowledgeExtractor->>SolvingAPI: extractKnowledgePoints(questionId)
+    SolvingAPI->>Server: POST /api/v1/solving/extract/{questionId}
+    
+    alt 请求成功
+        Server->>SolvingAPI: 返回提取结果
+        SolvingAPI->>KnowledgeExtractor: 返回数据
+        KnowledgeExtractor->>KnowledgeExtractor: setExtracted(response.data)
+        KnowledgeExtractor->>User: 显示提取的知识点列表
+    else 请求失败
+        Server->>SolvingAPI: 返回错误
+        SolvingAPI->>KnowledgeExtractor: 返回错误
+        KnowledgeExtractor->>User: 显示提取失败提示
+    end
+    
+    KnowledgeExtractor->>KnowledgeExtractor: 设置loading=false
+    
+    User->>KnowledgeExtractor: 点击"标记"按钮
+    KnowledgeExtractor->>KnowledgeAPI: createUserMark({knowledge_point_id, question_id})
+    KnowledgeAPI->>Server: POST /api/v1/knowledge/user-mark
+    
+    alt 请求成功
+        Server->>KnowledgeAPI: 返回成功
+        KnowledgeAPI->>KnowledgeExtractor: 返回结果
+        KnowledgeExtractor->>KnowledgeExtractor: 更新selectedPoints状态
+        KnowledgeExtractor->>User: 显示标记成功提示
+    else 请求失败
+        Server->>KnowledgeAPI: 返回错误
+        KnowledgeAPI->>KnowledgeExtractor: 返回错误
+        KnowledgeExtractor->>User: 显示标记失败提示
+    end
+```
+
+## 10. 性能优化策略
+
+### 10.1 数据预取与缓存
+
+使用React Query实现数据预取和缓存：
+
+```typescript
+// 配置全局缓存策略
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000, // 1分钟
-      cacheTime: 5 * 60 * 1000, // 5分钟
-      retry: 1,
       refetchOnWindowFocus: false,
-    },
-  },
+      staleTime: 5 * 60 * 1000, // 5分钟
+      cacheTime: 30 * 60 * 1000, // 30分钟
+      retry: 1
+    }
+  }
 });
 ```
 
-### 性能监控
+### 10.2 按需加载与代码分割
 
-```tsx
-// lib/utils/vitals.ts
-const reportWebVitals = (metric) => {
-  // 发送性能指标到分析服务
-  console.log(metric);
-  // ...
-};
-
-export default reportWebVitals;
+```mermaid
+flowchart LR
+    A[应用入口] --> B{路由匹配}
+    B --> C[动态引入组件]
+    C --> D{是否加载完成?}
+    D -- 否 --> E[显示加载状态]
+    D -- 是 --> F[渲染组件]
+    
+    subgraph 代码包
+    G[Dashboard.js]
+    H[QuestionList.js]
+    I[KnowledgeList.js]
+    J[其他组件]
+    end
+    
+    C -.-> G
+    C -.-> H
+    C -.-> I
+    C -.-> J
 ```
 
-> **性能目标**：首屏加载时间(FCP) < 1.2秒，交互延迟(FID) < 100ms。
+### 10.3 虚拟列表
 
-### 章节要点
+对于长列表数据，使用虚拟列表优化性能：
 
-- ✅ 懒加载优化初始加载体验
-- ✅ 图像优化减少网络负载
-- ✅ 缓存策略减少不必要的请求
-- ✅ 性能监控及时发现问题
-
-## 13. 部署流程
-
-### 生产构建步骤
-
-```bash
-# 生成API类型
-npm run generate-api
-
-# 构建生产版本
-npm run build
-
-# 启动生产服务器
-npm run start
+```mermaid
+flowchart TD
+    A[虚拟列表组件] --> B[计算可视区域]
+    B --> C[计算可视项目数量]
+    C --> D[计算起始索引]
+    D --> E[只渲染可视区域项目]
+    E --> F[监听滚动事件]
+    F --> G{滚动位置变化?}
+    G -- 是 --> B
+    G -- 否 --> E
 ```
 
-### 容器化部署
 
-```dockerfile
-# Dockerfile
-FROM node:18-alpine AS base
+## 12. 开发规范与最佳实践
 
-FROM base AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+### 12.1 组件开发规范
 
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
+- 采用函数式组件和React Hooks
+- 组件拆分原则：单一职责，可复用性
+- 组件命名：PascalCase，描述组件功能
+- Props类型使用TypeScript接口定义
 
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV production
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+### 12.2 状态管理原则
 
-EXPOSE 3000
-CMD ["node", "server.js"]
+- 本地状态：使用useState/useReducer管理组件内部状态
+- 全局状态：使用Redux管理应用级状态
+- 服务器状态：使用React Query管理API数据状态
+
+### 12.3 TypeScript类型定义
+
+```typescript
+// types/index.ts
+
+// 错题类型
+export interface Question {
+  id: number;
+  user_id: number;
+  content: string;
+  solution?: string;
+  remarks?: string;
+  image_url?: string;
+  created_at: string;
+}
+
+// 知识点类型
+export interface KnowledgePoint {
+  id: number;
+  subject: string;
+  chapter: string;
+  section: string;
+  item: string;
+  details: string;
+  mark_count: number;
+  created_at: string;
+}
+
+// 用户标记类型
+export interface UserMark {
+  id: number;
+  user_id: number;
+  knowledge_point_id: number;
+  question_id: number;
+  marked_at: string;
+}
 ```
 
-### 环境配置
+## 13. 测试与质量保障
 
-- 开发环境：`.env.development`
-- 测试环境：`.env.test`
-- 生产环境：`.env.production`
+### 13.1 单元测试示例
 
-> **部署检查清单**：确保环境变量、缓存配置、CDN设置和安全头部都已正确配置。
+```typescript
+// __tests__/components/ErrorSubmitForm.test.tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import ErrorSubmitForm from '../../components/business/ErrorSubmitForm';
 
-### 章节要点
+test('renders error submit form', () => {
+  render(<ErrorSubmitForm />);
+  expect(screen.getByText('提交错题')).toBeInTheDocument();
+});
 
-- ✅ 标准化的构建流程确保一致性
-- ✅ 容器化简化部署和扩展
-- ✅ 环境变量分离不同环境配置
-
-## 14. 开发规范
-
-### 代码风格
-
-- ESLint + Prettier保持统一风格
-- TypeScript严格模式确保类型安全
-- 命名约定：
-  - 组件：PascalCase
-  - 函数/变量：camelCase
-  - 常量：UPPER_SNAKE_CASE
-
-### 提交规范
-
-使用约定式提交(Conventional Commits):
-```
-feat: 添加知识点标记功能
-fix: 修复错题列表分页问题
-docs: 更新文档
+test('shows validation error for empty content', async () => {
+  render(<ErrorSubmitForm />);
+  fireEvent.click(screen.getByText('提交'));
+  
+  expect(await screen.findByText('请输入错题内容')).toBeInTheDocument();
+});
 ```
 
-### 团队协作流程
+### 13.2 端到端测试示例
 
-![开发流程图](https://placeholder-for-dev-workflow.png)
+```typescript
+// cypress/integration/error-submit.spec.js
+describe('错题提交流程', () => {
+  beforeEach(() => {
+    cy.login(); // 自定义命令：登录
+    cy.visit('/questions/new');
+  });
+  
+  it('可以成功提交错题', () => {
+    cy.get('textarea[name="content"]').type('这是一道测试错题');
+    cy.get('textarea[name="remarks"]').type('测试备注');
+    cy.get('button[type="submit"]').click();
+    
+    cy.url().should('include', '/questions/');
+    cy.contains('错题提交成功');
+  });
+});
+```
 
-> **协作提示**：创建新功能时先创建功能分支，完成后提交PR进行代码审查。
+## 14. 错误处理机制
 
-### 章节要点
+为保证系统稳定性和用户体验，GradNote前端应实现全面的错误处理策略，涵盖各类可能出现的错误情况。
 
-- ✅ 统一的代码和提交规范提高可维护性
-- ✅ 明确的分支管理策略简化团队协作
-- ✅ 代码审查确保代码质量
+### 14.1 错误处理层次架构
 
----
+前端错误处理应采用分层设计，确保错误被及时捕获并得到合理处理。
 
-## 总结
+```mermaid
+graph TD
+    A[用户操作] --> B[组件层]
+    B --> C[服务层]
+    C --> D[网络层]
+    D --> E[后端API]
+    
+    E -- 错误响应 --> F[网络层错误处理]
+    F -- 错误传递 --> G[服务层错误处理]
+    G -- 错误传递 --> H[组件层错误处理]
+    H -- 用户反馈 --> I[错误UI展示]
+```
 
-本文档提供了GradNote前端项目的技术架构和实现方案，涵盖了从项目结构到部署的完整开发流程。开发团队应遵循本文档的规范和最佳实践，确保项目的一致性和质量。
+### 14.2 网络请求错误处理
 
-### 技术栈亮点
+针对API请求过程中可能出现的各类网络错误，设计系统性处理方案。
 
-- Next.js 14 App Router提供优化的服务端渲染和路由
-- Zustand + React Query实现高效状态管理
-- Tailwind CSS实现响应式设计
-- TypeScript确保类型安全
+```mermaid
+flowchart TD
+    A[发起API请求] --> B{请求是否成功?}
+    B -- 是 --> C[处理成功响应]
+    B -- 否 --> D{错误类型判断}
+    
+    D -- 网络连接失败 --> E[展示网络连接错误]
+    D -- 401未授权 --> F[重定向到登录页]
+    D -- 403禁止访问 --> G[展示权限不足提示]
+    D -- 404资源不存在 --> H[展示资源不存在提示]
+    D -- 500服务器错误 --> I[展示服务器错误提示]
+    D -- 超时 --> J[展示请求超时提示]
+    D -- 其他错误 --> K[展示通用错误提示]
+    
+    E & F & G & H & I & J & K --> L[记录错误日志]
+    F --> M[清除认证信息]
+```
+
+### 14.3 业务错误处理策略
+
+业务错误是指请求成功但返回业务操作失败的情况，需要针对不同业务场景设计特定处理方案。
+
+```mermaid
+flowchart TD
+    A[接收业务响应] --> B{响应状态码是否为成功?}
+    B -- 是 --> C{业务状态码检查}
+    B -- 否 --> D[进入网络错误处理流程]
+    
+    C -- 业务成功 --> E[正常处理业务数据]
+    C -- 业务失败 --> F{业务错误类型}
+    
+    F -- 数据验证错误 --> G[高亮表单错误字段]
+    F -- 业务规则冲突 --> H[展示冲突提示]
+    F -- 资源已存在 --> I[展示资源已存在提示]
+    F -- 资源状态错误 --> J[展示状态错误提示]
+    F -- 权限不足 --> K[展示权限提示]
+    F -- 其他业务错误 --> L[展示具体业务错误信息]
+    
+    G & H & I & J & K & L --> M[提供错误修复建议]
+```
+
+### 14.4 异常边界与组件错误处理
+
+为防止组件渲染错误导致整个应用崩溃，实现React错误边界机制。
+
+```mermaid
+graph TD
+    A[应用根组件] --> B[ErrorBoundary包裹]
+    B --> C{组件渲染是否出错?}
+    C -- 否 --> D[正常渲染组件]
+    C -- 是 --> E[捕获错误]
+    E --> F[显示降级UI]
+    E --> G[记录错误信息]
+```
+
+### 14.5 错误反馈与用户体验
+
+设计友好的错误反馈机制，提升用户体验。
+
+```mermaid
+flowchart TD
+    A[错误发生] --> B[确定错误类型]
+    B --> C{错误是否可自动恢复?}
+    
+    C -- 是 --> D[静默重试]
+    D --> E{重试是否成功?}
+    E -- 是 --> F[继续正常流程]
+    E -- 否 --> G[提示用户]
+    
+    C -- 否 --> G
+    G --> H{错误是否可用户操作解决?}
+    
+    H -- 是 --> I[提供操作建议]
+    I --> J[引导用户操作]
+    
+    H -- 否 --> K[友好提示无法完成操作]
+    K --> L[提供替代方案]
+```
+
+### 14.6 全局错误处理配置
+
+在应用级别实现统一的错误处理配置，确保一致性和可维护性。
+
+```mermaid
+graph TD
+    A[全局错误配置] --> B[Axios拦截器]
+    A --> C[Redux错误中间件]
+    A --> D[React错误边界]
+    A --> E[全局错误日志服务]
+    
+    B --> F[处理HTTP错误]
+    C --> G[处理状态管理错误]
+    D --> H[处理渲染错误]
+    E --> I[错误上报与分析]
+    
+    F & G & H --> J[统一错误消息格式]
+    J --> K[错误通知组件]
+    I --> L[错误统计面板]
+```
+
+### 14.7 错误日志与监控
+
+建立完善的错误日志收集和监控系统，及时发现并解决问题。
+
+```mermaid
+flowchart TD
+    A[错误捕获] --> B[格式化错误信息]
+    B --> C[记录错误上下文]
+    C --> D[错误严重性分级]
+    D --> E{是否需要上报?}
+    
+    E -- 是 --> F[发送到日志服务]
+    F --> G[错误聚合分析]
+    G --> H[生成错误报告]
+    H --> I[开发团队处理]
+    
+    E -- 否 --> J[仅本地记录]
+```
+
+### 14.8 错误处理最佳实践
+
+1. **错误预防**：
+   - 实施严格的输入验证
+   - 使用TypeScript类型检查
+   - 编写防御性代码
+   - 添加单元测试覆盖边缘情况
+
+2. **优雅降级**：
+   - 设计关键功能的降级方案
+   - 实现部分加载机制
+   - 提供离线功能支持
+
+3. **用户体验优化**：
+   - 避免技术术语错误
+   - 提供清晰的解决步骤
+   - 设计一致的错误UI样式
+
+4. **错误恢复机制**：
+   - 实现自动重试机制
+   - 提供手动重试选项
+   - 保存用户输入数据防止丢失
+
+5. **错误追踪**：
+   - 为每个错误生成唯一ID
+   - 记录错误环境信息
+   - 实现用户反馈渠道
