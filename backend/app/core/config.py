@@ -72,8 +72,14 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
 
+    # 日志配置
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "info")
+    LOG_REQUEST_BODY: str = os.getenv("LOG_REQUEST_BODY", "false")
+    LOG_ENCODING: str = os.getenv("LOG_ENCODING", "utf-8")
+
     class Config:
         case_sensitive = True
         env_file = ".env"
+        extra = "ignore"  # 允许额外的字段，忽略不在模型中定义的字段
 
 settings = Settings() 
