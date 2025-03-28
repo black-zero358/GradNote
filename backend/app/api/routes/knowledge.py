@@ -95,6 +95,16 @@ async def get_sections(
     """
     return knowledge_service.get_sections_by_chapter(db, subject, chapter)
 
+@router.get("/user-marks", response_model=List[Mark])
+async def get_user_marks(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取当前用户的所有标记
+    """
+    return knowledge_service.get_user_marks(db, current_user.id)
+
 @router.get("/{knowledge_point_id}", response_model=KnowledgePoint)
 async def get_knowledge_point(
     knowledge_point_id: int,
@@ -144,14 +154,4 @@ async def create_user_mark(
         question_id=mark_data.question_id
     )
     
-    return user_mark
-
-@router.get("/user-marks", response_model=List[Mark])
-async def get_user_marks(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    获取当前用户的所有标记
-    """
-    return knowledge_service.get_user_marks(db, current_user.id) 
+    return user_mark 
