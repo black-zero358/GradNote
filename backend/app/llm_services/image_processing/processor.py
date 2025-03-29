@@ -46,15 +46,54 @@ logger = logging.getLogger(__name__)
 
 class ImageProcessorError(Exception):
     """图像处理器异常基类"""
-    pass
+    def __init__(self, message: str = "图像处理错误"):
+        self.message = message
+        super().__init__(self.message)
+
 
 class ImageSizeExceededError(ImageProcessorError):
     """图像大小超出限制异常"""
-    pass
+    def __init__(self, file_size: int, max_size: int):
+        self.file_size = file_size
+        self.max_size = max_size
+        super().__init__(f"图片大小({file_size}字节)超过限制({max_size}字节)")
+
 
 class ImageFormatError(ImageProcessorError):
     """图像格式错误异常"""
-    pass
+    def __init__(self, format_name: str = None):
+        message = "不支持的图像格式"
+        if format_name:
+            message = f"不支持的图像格式: {format_name}"
+        super().__init__(message)
+
+
+class ImagePathError(ImageProcessorError):
+    """图像路径错误异常"""
+    def __init__(self, path: str, reason: str):
+        self.path = path
+        self.reason = reason
+        super().__init__(f"图像路径无效: {reason}, 路径: {path}")
+
+
+class ImageReadError(ImageProcessorError):
+    """图像读取错误异常"""
+    def __init__(self, file_path: str, error: str):
+        self.file_path = file_path
+        super().__init__(f"读取图片文件时出错: {error}, 文件路径: {file_path}")
+
+
+class ImageProcessingAPIError(ImageProcessorError):
+    """图像处理API错误异常"""
+    def __init__(self, api_error: str):
+        self.api_error = api_error
+        super().__init__(f"图像处理API调用失败: {api_error}")
+
+
+class InvalidBase64Error(ImageProcessorError):
+    """无效的Base64编码异常"""
+    def __init__(self):
+        super().__init__("提供的字符串不是有效的base64编码")
 
 class ImageProcessor:
     """图像处理类，用于将错题图片转换为文本"""
@@ -63,7 +102,8 @@ class ImageProcessor:
                  api_key: Optional[str] = None, 
                  api_base: Optional[str] = None, 
                  model_name: Optional[str] = None,
-                 max_image_size: int = DEFAULT_MAX_IMAGE_SIZE):
+                 max_image_size: int = DEFAULT_MAX_IMAGE_SIZE,
+                 strict_format_check: bool = False):
         """
         初始化图像处理器
         
@@ -72,6 +112,7 @@ class ImageProcessor:
             api_base: API基础URL，默认从环境变量获取
             model_name: VLM模型名称，默认从环境变量获取
             max_image_size: 最大处理图片大小（字节），默认20MB
+            strict_format_check: 是否启用严格的图像格式检查，启用后对未知格式将抛出异常
         """
         self.langfuse_handler = CallbackHandler()
         self.vlm = ChatOpenAI(
@@ -81,6 +122,7 @@ class ImageProcessor:
             callbacks=[self.langfuse_handler]
         )
         self.max_image_size = max_image_size
+        self.strict_format_check = strict_format_check
     
     def _validate_file_path(self, image_path: str) -> str:
         """
@@ -93,30 +135,34 @@ class ImageProcessor:
             绝对路径字符串
             
         Raises:
-            ValueError: 路径无效或不存在
-            ImageProcessorError: 文件不是图片
+            ImagePathError: 路径无效或不存在
+            ImageSizeExceededError: 图片大小超过限制
+            ImageFormatError: 不支持的图像格式
         """
         # 确保路径存在且为文件
         path = Path(image_path).resolve()
         if not path.exists():
             logger.error(f"文件不存在: {image_path}")
-            raise ValueError(f"文件不存在: {image_path}")
+            raise ImagePathError(image_path, "文件不存在")
         if not path.is_file():
             logger.error(f"路径不是文件: {image_path}")
-            raise ValueError(f"路径不是文件: {image_path}")
+            raise ImagePathError(image_path, "路径不是文件")
         
         # 检查文件大小
         file_size = path.stat().st_size
         if file_size > self.max_image_size:
             logger.error(f"图片大小({file_size}字节)超过限制({self.max_image_size}字节)")
             raise ImageSizeExceededError(
-                f"图片大小({file_size}字节)超过限制({self.max_image_size}字节)"
+                file_size, self.max_image_size
             )
         
         # 检查文件扩展名是否为已知图像格式
         ext = path.suffix.lstrip('.').lower()
         if ext not in MIME_TYPES:
             logger.warning(f"未知的图片扩展名: {ext}")
+            # 可以选择是否在严格模式下抛出异常
+            if getattr(self, 'strict_format_check', False):
+                raise ImageFormatError(ext)
         
         return str(path)
     
@@ -173,8 +219,10 @@ class ImageProcessor:
             Tuple[str, bytes]: (MIME类型, 图像字节数据)
             
         Raises:
-            OSError: 文件读取错误
-            ImageProcessorError: 图像处理错误
+            ImagePathError: 路径无效或不存在
+            ImageSizeExceededError: 图片大小超过限制
+            ImageFormatError: 不支持的图像格式
+            ImageReadError: 文件读取错误
         """
         # 验证文件路径
         validated_path = self._validate_file_path(image_path)
@@ -196,7 +244,7 @@ class ImageProcessor:
             return mime_type, image_data
         except OSError as e:
             logger.error(f"读取图片文件时出错: {str(e)}")
-            raise ImageProcessorError(f"读取图片文件时出错: {str(e)}")
+            raise ImageReadError(validated_path, str(e))
     
     def process_image_file(self, image_path: str) -> str:
         """
@@ -209,7 +257,12 @@ class ImageProcessor:
             提取的文本内容
             
         Raises:
-            ImageProcessorError: 图像处理错误
+            ImagePathError: 路径无效或不存在
+            ImageSizeExceededError: 图像大小超出限制
+            ImageFormatError: 不支持的图像格式
+            ImageReadError: 图像读取错误
+            InvalidBase64Error: 图像转换为base64时发生错误
+            ImageProcessingAPIError: 图像处理API错误
         """
         try:
             # 加载图像并检测类型
@@ -220,9 +273,12 @@ class ImageProcessor:
             
             # 调用VLM提取文本
             return self.process_image_base64(base64_image, mime_type)
+        except (ImagePathError, ImageSizeExceededError, ImageFormatError, ImageReadError, InvalidBase64Error) as e:
+            # 已知的特定异常，直接抛出
+            raise
         except Exception as e:
             logger.error(f"处理图像文件时出错: {str(e)}")
-            raise ImageProcessorError(f"处理图像文件时出错: {str(e)}")
+            raise ImageProcessingAPIError(str(e))
     
     def process_image_base64(self, base64_image: str, mime_type: str = 'image/png') -> str:
         """
@@ -236,20 +292,21 @@ class ImageProcessor:
             提取的文本内容
             
         Raises:
-            ValueError: base64字符串无效
-            ImageProcessorError: 图像处理错误
+            InvalidBase64Error: base64字符串无效
+            ImageSizeExceededError: 图像大小超出限制
+            ImageProcessingAPIError: 图像处理API错误
         """
         # 验证base64字符串
         if not self._is_valid_base64(base64_image):
             logger.error("提供的字符串不是有效的base64编码")
-            raise ValueError("提供的字符串不是有效的base64编码")
+            raise InvalidBase64Error()
         
         # 检查图片大小（近似值，base64编码比原始数据大约大1/3）
         approx_size = (len(base64_image) * 3) // 4
         if approx_size > self.max_image_size:
             logger.error(f"解码后图片大小(约{approx_size}字节)超过限制({self.max_image_size}字节)")
             raise ImageSizeExceededError(
-                f"解码后图片大小(约{approx_size}字节)超过限制({self.max_image_size}字节)"
+                approx_size, self.max_image_size
             )
         
         try:
@@ -260,7 +317,7 @@ class ImageProcessor:
                     content=[
                         {
                             "type": "text", 
-                            "text": "请提取这张错题图片中的所有文本内容，包括题目、选项等。保持原始格式，不要遗漏任何文字和符号。"
+                            "text": "请提取这张错题图片中的文本内容，包括题目、选项等。保持原始格式，不要遗漏任何文字和符号。"
                         },
                         {
                             "type": "image_url",
@@ -279,7 +336,7 @@ class ImageProcessor:
             return response.content
         except Exception as e:
             logger.error(f"处理base64图像时出错: {str(e)}")
-            raise ImageProcessorError(f"处理base64图像时出错: {str(e)}")
+            raise ImageProcessingAPIError(str(e))
     
     def process_image_bytes(self, image_bytes: bytes) -> str:
         """
@@ -293,13 +350,15 @@ class ImageProcessor:
             
         Raises:
             ImageSizeExceededError: 图像大小超出限制
-            ImageProcessorError: 图像处理错误
+            ImageFormatError: 不支持的图像格式
+            InvalidBase64Error: 图像转换为base64时发生错误
+            ImageProcessingAPIError: 图像处理API错误
         """
         # 检查图片大小
         if len(image_bytes) > self.max_image_size:
             logger.error(f"图片大小({len(image_bytes)}字节)超过限制({self.max_image_size}字节)")
             raise ImageSizeExceededError(
-                f"图片大小({len(image_bytes)}字节)超过限制({self.max_image_size}字节)"
+                len(image_bytes), self.max_image_size
             )
         
         try:
@@ -311,6 +370,9 @@ class ImageProcessor:
             
             # 调用VLM提取文本
             return self.process_image_base64(base64_image, mime_type)
+        except (ImageSizeExceededError, InvalidBase64Error) as e:
+            # 已知的特定异常，直接抛出
+            raise
         except Exception as e:
             logger.error(f"处理图像字节数据时出错: {str(e)}")
-            raise ImageProcessorError(f"处理图像字节数据时出错: {str(e)}") 
+            raise ImageProcessingAPIError(str(e)) 

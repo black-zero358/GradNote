@@ -37,6 +37,17 @@ async def process_image(
     - text: 从图像中提取的文本
     - image_url: 保存后的图像URL
     - message: 错误信息（仅当status为error时）
+    - error_code: 错误代码（仅当status为error时）
+    
+    可能的错误代码:
+    - IMAGE_SIZE_EXCEEDED: 图像过大
+    - IMAGE_FORMAT_ERROR: 不支持的图像格式
+    - INVALID_IMAGE_DATA: 无效的图像数据
+    - INVALID_IMAGE_PATH: 图像路径无效
+    - IMAGE_READ_ERROR: 图像读取错误
+    - API_ERROR: 图像处理API错误
+    - PROCESSING_ERROR: 图像处理失败
+    - UNKNOWN_ERROR: 未知错误
     """
     # 检查文件类型
     if not file.content_type.startswith('image/'):
@@ -52,8 +63,27 @@ async def process_image(
     result = await image_service.process_question_image(file_content, file.filename)
     
     if result["status"] == "error":
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        
+        # 根据错误码设置适当的HTTP状态码
+        error_code_map = {
+            "IMAGE_SIZE_EXCEEDED": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            "IMAGE_FORMAT_ERROR": status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            "INVALID_IMAGE_DATA": status.HTTP_400_BAD_REQUEST,
+            "INVALID_IMAGE_PATH": status.HTTP_400_BAD_REQUEST,
+            "IMAGE_READ_ERROR": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "API_ERROR": status.HTTP_503_SERVICE_UNAVAILABLE,
+            "PROCESSING_ERROR": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "UNKNOWN_ERROR": status.HTTP_500_INTERNAL_SERVER_ERROR
+        }
+        
+        status_code = error_code_map.get(
+            result.get("error_code"), 
+            status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status_code,
             detail=result["message"]
         )
     

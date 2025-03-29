@@ -6,4 +6,5 @@ class ImageProcessingResponse(BaseModel):
     status: str
     text: Optional[str] = None
     image_url: Optional[str] = None
-    message: Optional[str] = None 
+    message: Optional[str] = None
+    error_code: Optional[str] = None 
