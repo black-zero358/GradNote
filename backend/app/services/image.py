@@ -2,7 +2,7 @@ import os
 from typing import Dict, Optional
 import aiofiles
 import uuid
-from app.ml.image_processing import ImageProcessor
+from app.llm_services.image_processing import ImageProcessor
 
 # 从环境变量获取配置
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")

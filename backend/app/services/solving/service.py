@@ -5,8 +5,8 @@ from langchain.schema import Document
 from app.models.question import WrongQuestion
 from app.models.knowledge import KnowledgePoint, QuestionKnowledgeRelation
 from app.services import knowledge as knowledge_service
-from app.ml.solving import SolveWorkflow
-from app.ml.knowledge_mark import KnowledgeExtractor
+from app.llm_services.solving import SolveWorkflow
+from app.llm_services.knowledge_mark import KnowledgeExtractor
 
 # 从环境变量获取API配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
