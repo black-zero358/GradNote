@@ -20,6 +20,7 @@ async def create_question(
     db_question = WrongQuestion(
         user_id=current_user.id,
         content=question_in.content,
+        subject=question_in.subject,
         solution=question_in.solution,
         remarks=question_in.remarks,
         image_url=question_in.image_url

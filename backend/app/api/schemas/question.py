@@ -4,6 +4,7 @@ from datetime import datetime
 
 class QuestionBase(BaseModel):
     content: str
+    subject: Optional[str] = None
     solution: Optional[str] = None
     remarks: Optional[str] = None
 

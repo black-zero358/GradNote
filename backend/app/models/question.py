@@ -7,6 +7,7 @@ class WrongQuestion(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    subject = Column(String(50), nullable=True)
     content = Column(Text, nullable=False)
     solution = Column(Text)
     remarks = Column(Text)
