@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+import logging
 
 from app.api.routes.api import api_router
 from app.core.config import settings
@@ -10,9 +11,14 @@ from app.db.create_tables import create_tables
 from app.db.init_db import init_db
 from app.db.create_index import create_indexes
 from app.db.session import SessionLocal
+from app.db.reset_sequence import reset_all_sequences
 
 # 加载环境变量
 load_dotenv()
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -41,18 +47,21 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.on_event("startup")
 async def startup_db_client():
     """应用启动时创建数据库表并初始化数据"""
-    # 创建所有表
-    create_tables()
-    
-    # 创建数据库索引
-    create_indexes()
-    
-    # 初始化数据库数据
-    db = SessionLocal()
     try:
+        # 创建所有表
+        create_tables()
+        
+        # 创建数据库索引
+        create_indexes()
+        
+        # 初始化数据库数据
+        db = SessionLocal()
         init_db(db)
-    finally:
+        # 重置序列
+        reset_all_sequences()
         db.close()
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
 
 @app.get("/")
 async def root():

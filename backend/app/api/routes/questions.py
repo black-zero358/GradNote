@@ -165,28 +165,36 @@ async def create_question_from_image(
         "image_url": result["image_url"]
     }
     
-    # 保存到数据库
-    db_question = WrongQuestion(
-        user_id=current_user.id,
-        **question_data
-    )
-    db.add(db_question)
-    db.commit()
-    db.refresh(db_question)
-    
-    # 将 SQLAlchemy 模型转换为字典，而不是直接返回模型对象
-    question_dict = {
-        "id": db_question.id,
-        "user_id": db_question.user_id,
-        "content": db_question.content,
-        "solution": db_question.solution,
-        "remarks": db_question.remarks,
-        "image_url": db_question.image_url,
-        "created_at": db_question.created_at
-    }
-    
-    return {
-        "status": "success",
-        "data": question_dict,
-        "message": "从图片创建错题成功"
-    } 
+    try:
+        
+        # 保存到数据库
+        db_question = WrongQuestion(
+            user_id=current_user.id,
+            **question_data
+        )
+        db.add(db_question)
+        db.commit()
+        db.refresh(db_question)
+        
+        # 将 SQLAlchemy 模型转换为字典，而不是直接返回模型对象
+        question_dict = {
+            "id": db_question.id,
+            "user_id": db_question.user_id,
+            "content": db_question.content,
+            "solution": db_question.solution,
+            "remarks": db_question.remarks,
+            "image_url": db_question.image_url,
+            "created_at": db_question.created_at
+        }
+        
+        return {
+            "status": "success",
+            "data": question_dict,
+            "message": "从图片创建错题成功"
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建错题失败: {str(e)}"
+        ) 
