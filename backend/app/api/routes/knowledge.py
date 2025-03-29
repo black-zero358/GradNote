@@ -13,6 +13,7 @@ from app.api.schemas.knowledge import (
     Mark
 )
 from app.models.user import User
+from app.models.knowledge import KnowledgePoint as KnowledgePointModel
 
 router = APIRouter()
 
@@ -154,4 +155,33 @@ async def create_user_mark(
         question_id=mark_data.question_id
     )
     
-    return user_mark 
+    return user_mark
+
+@router.post("/", response_model=KnowledgePoint, status_code=status.HTTP_201_CREATED)
+async def create_knowledge_point(
+    knowledge_point_data: KnowledgePointCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    创建新的知识点
+    """
+    # 检查是否已存在相同的知识点
+    existing_knowledge_point = db.query(KnowledgePointModel).filter(
+        KnowledgePointModel.subject == knowledge_point_data.subject,
+        KnowledgePointModel.chapter == knowledge_point_data.chapter,
+        KnowledgePointModel.section == knowledge_point_data.section,
+        KnowledgePointModel.item == knowledge_point_data.item
+    ).first()
+    
+    if existing_knowledge_point:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="相同知识点已存在"
+        )
+    
+    # 创建知识点
+    return knowledge_service.create_knowledge_point(
+        db=db,
+        knowledge_point_data=knowledge_point_data.model_dump()
+    ) 

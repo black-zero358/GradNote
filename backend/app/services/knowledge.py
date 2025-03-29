@@ -225,4 +225,32 @@ def get_user_marks(db: Session, user_id: int) -> List[UserMark]:
     Returns:
     - 用户标记列表
     """
-    return db.query(UserMark).filter(UserMark.user_id == user_id).all() 
+    return db.query(UserMark).filter(UserMark.user_id == user_id).all()
+
+def create_knowledge_point(
+    db: Session,
+    knowledge_point_data: Dict[str, Any]
+) -> KnowledgePoint:
+    """
+    创建新的知识点
+
+    Parameters:
+    - db: 数据库会话
+    - knowledge_point_data: 知识点数据字典
+    
+    Returns:
+    - 创建的知识点对象
+    """
+    knowledge_point = KnowledgePoint(
+        subject=knowledge_point_data["subject"],
+        chapter=knowledge_point_data["chapter"],
+        section=knowledge_point_data["section"],
+        item=knowledge_point_data["item"],
+        details=knowledge_point_data.get("details"),
+        mark_count=0
+    )
+    
+    db.add(knowledge_point)
+    db.commit()
+    db.refresh(knowledge_point)
+    return knowledge_point 
