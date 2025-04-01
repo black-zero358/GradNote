@@ -1,30 +1,68 @@
-# GradNote 后端启动文档
+# GradNote 后端服务
 
-本文档介绍了如何设置和运行GradNote错题知识点管理系统的后端服务。
+## 简介
+
+GradNote是一个错题知识点管理系统，帮助学生高效管理和学习错题。本文档介绍了后端服务的设置、运行和维护方法。
 
 ## 目录
+
+- [功能特性](#功能特性)
+- [技术栈](#技术栈)
 - [环境要求](#环境要求)
-- [安装步骤](#安装步骤)
-- [运行应用](#运行应用)
+- [快速开始](#快速开始)
+- [详细配置](#详细配置)
 - [API文档](#api文档)
-- [初始化数据](#初始化数据)
-- [主要功能](#主要功能)
 - [项目结构](#项目结构)
+- [开发指南](#开发指南)
+- [部署指南](#部署指南)
 - [故障排除](#故障排除)
-- [优化与监控](#优化与监控)
+- [性能优化](#性能优化)
+- [贡献指南](#贡献指南)
+
+## 功能特性
+
+- 用户认证与授权
+- 错题管理与分析
+- 知识点提取与关联
+- 智能解题辅助
+- 图像处理与OCR
+- 数据统计与可视化
+
+## 技术栈
+
+- **Web框架**: FastAPI
+- **数据库**: PostgreSQL 14+
+- **缓存**: Redis
+- **AI模型**: LangChain, OpenAI
+- **图像处理**: PIL, OpenCV
+- **认证**: JWT
+- **文档**: OpenAPI/Swagger
 
 ## 环境要求
 
+### 基础环境
 - Python 3.8+
 - PostgreSQL 14+
-- Redis（用于缓存和任务队列）
+- Redis 6+
+- Node.js 16+ (用于前端开发)
 
-## 安装步骤
+### 硬件推荐配置
+- CPU: 4核+
+- 内存: 8GB+
+- 存储: 20GB+
+- GPU: 推荐NVIDIA GPU (用于图像处理)
+
+### 操作系统支持
+- Linux (推荐Ubuntu 20.04+)
+- Windows 10/11
+- macOS 10.15+
+
+## 快速开始
 
 ### 1. 克隆代码库
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/yourusername/GradNote-v1.git
 cd GradNote-v1/backend
 ```
 
@@ -35,7 +73,7 @@ cd GradNote-v1/backend
 python -m venv venv
 .\venv\Scripts\activate
 
-# Linux/MacOS
+# Linux/macOS
 python -m venv venv
 source venv/bin/activate
 ```
@@ -43,21 +81,22 @@ source venv/bin/activate
 ### 3. 安装依赖
 
 ```bash
+# 基础依赖
 pip install -r requirements.txt
 
-# 如果需要GPU支持，还需安装CUDA相关依赖
+# GPU支持（可选）
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
-### 4. 配置环境变量
+### 4. 环境配置
 
-创建`.env`文件，内容如下：
+创建`.env`文件：
 
-```
+```ini
 # 数据库配置
 POSTGRES_SERVER=localhost
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=123456
+POSTGRES_PASSWORD=your_password
 POSTGRES_DB=GradNote
 POSTGRES_PORT=5432
 
@@ -68,7 +107,7 @@ REDIS_DB=0
 REDIS_PASSWORD=
 
 # 安全配置
-SECRET_KEY=your-secret-key-for-production
+SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
@@ -92,273 +131,307 @@ API_HOST=0.0.0.0
 UPLOAD_DIR=uploads
 MAX_UPLOAD_SIZE=10485760  # 10MB
 ALLOWED_IMAGE_TYPES=["image/jpeg", "image/png", "image/gif", "application/pdf"]
-
 ```
 
-根据您的实际环境修改上述配置。
-
-### 5. 准备PostgreSQL数据库
-
-1. 安装PostgreSQL数据库
-
-2. 创建数据库：
-   ```sql
-   CREATE DATABASE "GradNote";
-   ```
-
-## 运行应用
-
-### 开发模式运行
+### 5. 初始化数据库
 
 ```bash
-# Windows/Linux/MacOS
-cd backend
+# 创建数据库
+psql -U postgres
+CREATE DATABASE "GradNote";
+\q
+
+# 初始化表结构和数据
+python -m app.db.create_tables
+python -m app.db.init_db
+```
+
+### 6. 启动服务
+
+```bash
+# 开发模式
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
 
-### 生产模式运行
-
-```bash
-cd backend
+# 生产模式
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-### 使用Docker运行
+## 详细配置
 
-```bash
-# 构建Docker镜像
-docker build -t gradnote-backend .
+### 数据库配置
 
-# 运行容器
-docker run -d --name gradnote-backend -p 8000:8000 \
-  -e POSTGRES_SERVER=host.docker.internal \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=123456 \
-  -e POSTGRES_DB=GradNote \
-  -e POSTGRES_PORT=5432 \
-  gradnote-backend
+PostgreSQL配置说明：
+
+```sql
+-- 创建数据库
+CREATE DATABASE "GradNote";
+
+-- 创建用户（可选）
+CREATE USER gradnote WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE "GradNote" TO gradnote;
+
+-- 创建扩展（如果需要）
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+```
+
+### Redis配置
+
+redis.conf关键配置：
+
+```conf
+port 6379
+bind 127.0.0.1
+maxmemory 2gb
+maxmemory-policy allkeys-lru
+```
+
+### 文件上传配置
+
+支持的文件类型和大小限制：
+
+```python
+ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "application/pdf"
+]
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 ```
 
 ## API文档
 
-启动应用后，可以通过以下URL访问自动生成的API文档：
+API文档访问地址：
 
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+- OpenAPI JSON: http://localhost:8000/openapi.json
 
-## 初始化数据
-
-应用程序启动时会自动执行以下操作：
-1. 创建必要的数据库表
-2. 创建数据库索引以提高查询性能
-3. 添加初始用户（用户名：admin，密码：admin）
-4. 添加初始知识点数据
-
-如果需要手动初始化数据库，可以运行以下命令：
-
-```bash
-# 创建表
-python -m app.db.create_tables
-
-# 创建索引
-python -m app.db.create_index
-
-# 初始化数据
-python -c "from app.db.session import SessionLocal; from app.db.init_db import init_db; db = SessionLocal(); init_db(db); db.close()"
-```
-
-## 主要功能
-
-### 1. 用户认证 (`/api/v1/auth`)
-- 用户注册和登录
-- JWT令牌认证
-- 基于deps.py的依赖注入认证系统
-
-### 2. 错题管理 (`/api/v1/questions`)
-- 创建、更新、删除和查询错题
-- 支持按科目、难度等筛选错题
-- 错题图像上传和处理
-- 支持批量操作和分页查询
-- 错题知识点关联和标注
-
-### 3. 知识点管理 (`/api/v1/knowledge`)
-- 创建、更新、删除和查询知识点
-- 支持结构化查询和树形展示
-- 知识点自动标记和提取
-- 知识点关系图谱构建
-- 支持知识点难度评估
-
-### 4. 图像处理 (`/api/v1/image`)
-- 支持多种格式图像上传（JPG、PNG、PDF等）
-- 图像预处理和优化
-- OCR文本识别（通过image_processing模块）
-- 安全的文件处理和存储
-- 图像压缩和格式转换
-
-### 5. 智能解题 (`/api/v1/solving`)
-- 基于LangChain的解题辅助
-- 知识点提取和关联
-- 题目难度智能评估
-- 解题步骤分析和推导
-- 相似题目推荐
+详细API文档请参考：[backend-api.md](backend-api.md)
 
 ## 项目结构
 
-### 目录结构
-
 ```
 backend/
-├── app/                  # 应用主目录
-│   ├── api/              # API路由和模式定义
-│   │   ├── routes/       # API路由
-│   │   ├── schemas/      # Pydantic模型
+├── app/                    # 应用主目录
+│   ├── api/               # API相关代码
+│   │   ├── routes/       # API路由定义
+│   │   ├── schemas/      # 数据模型定义
 │   │   └── deps.py       # 依赖注入
 │   ├── core/             # 核心配置
-│   ├── db/               # 数据库相关代码
-│   ├── models/           # SQLAlchemy模型
+│   │   ├── config.py     # 配置管理
+│   │   ├── security.py   # 安全相关
+│   │   └── logging.py    # 日志配置
+│   ├── db/               # 数据库相关
+│   │   ├── session.py    # 数据库会话
+│   │   └── base.py      # 基础模型
+│   ├── models/           # 数据库模型
 │   ├── services/         # 业务逻辑
-│   ├── llm_services/               # 机器学习相关代码
+│   ├── llm_services/     # AI服务
 │   │   ├── image_processing/  # 图像处理
 │   │   ├── knowledge_mark/    # 知识点标记
-│   │   └── solving/           # 解题辅助
+│   │   └── solving/          # 解题辅助
 │   └── main.py           # 应用入口
-├── uploads/              # 上传文件存储
-├── tests/                # 测试
-├── requirements.txt      # 依赖包列表
-└── Dockerfile            # Docker配置
+├── tests/                # 测试代码
+│   ├── api/             # API测试
+│   ├── services/        # 服务测试
+│   └── conftest.py      # 测试配置
+├── uploads/             # 上传文件目录
+├── alembic/             # 数据库迁移
+├── requirements.txt     # 依赖清单
+├── Dockerfile          # Docker配置
+└── docker-compose.yml  # Docker编排
 ```
 
-### API路由结构
+## 开发指南
 
-```
-api/
-├── routes/
-│   ├── api.py          # API路由聚合
-│   ├── auth.py         # 认证相关路由
-│   ├── questions.py    # 错题管理路由
-│   ├── knowledge.py    # 知识点管理路由
-│   ├── image.py        # 图像处理路由
-│   └── solving.py      # 智能解题路由
-├── schemas/            # 数据模型定义
-└── deps.py            # 依赖注入
+### 代码规范
+
+- 遵循PEP 8规范
+- 使用Black进行代码格式化
+- 使用isort管理导入顺序
+- 使用flake8进行代码检查
+
+### 提交规范
+
+```bash
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
 ```
 
-### 机器学习模块结构
+类型(type)：
+- feat: 新功能
+- fix: 修复
+- docs: 文档
+- style: 格式
+- refactor: 重构
+- test: 测试
+- chore: 构建
 
+
+## 部署指南
+
+### Docker部署
+
+```bash
+# 构建镜像
+docker build -t gradnote-backend .
+
+# 运行容器
+docker run -d \
+  --name gradnote-backend \
+  -p 8000:8000 \
+  -e POSTGRES_SERVER=host.docker.internal \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=your_password \
+  -e POSTGRES_DB=GradNote \
+  gradnote-backend
 ```
-llm_services/
-├── image_processing/   # 图像处理模块
-├── knowledge_mark/     # 知识点标记模块
-└── solving/           # 智能解题模块
+
+### Docker Compose部署
+
+```yaml
+version: '3.8'
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: GradNote
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
 ```
 
 ## 故障排除
 
 ### 常见问题
 
-1. **数据库连接失败**：
-   - 确认PostgreSQL服务已启动
-   - 检查数据库连接信息是否正确
-   - 确认用户拥有足够的权限
-   - 检查防火墙设置是否允许数据库连接
-   - 常见错误码及解决方案：
-     * `FATAL: password authentication failed` - 检查POSTGRES_PASSWORD
-     * `FATAL: database does not exist` - 运行初始化脚本创建数据库
+1. **数据库连接问题**
+   - 检查数据库服务是否运行
+   - 验证连接信息是否正确
+   - 确认防火墙设置
 
-2. **Redis连接问题**：
-   - 确认Redis服务正在运行
-   - 检查Redis配置信息
-   - 验证Redis密码（如果设置）
-   - 常见错误：
-     * `Connection refused` - Redis服务未启动
-     * `AuthenticationError` - Redis密码错误
+2. **Redis连接问题**
+   - 检查Redis服务状态
+   - 验证密码配置
+   - 检查内存使用情况
 
-3. **API认证问题**：
-   - 默认管理员账户：
-     * 用户名：admin
-     * 密码：admin
-   - 登录接口：`POST /api/v1/auth/login`
-   - Token格式：`Authorization: Bearer <token>`
-   - 常见状态码：
-     * 401 - 未认证或token过期
-     * 403 - 权限不足
-     * 422 - 请求数据格式错误
+3. **文件上传问题**
+   - 检查目录权限
+   - 验证文件大小限制
+   - 确认支持的文件类型
 
-4. **文件上传问题**：
-   - 确保uploads目录存在且有写入权限
-   - 文件大小限制：10MB
-   - 支持的文件类型：
-     * 图片：JPG、PNG、GIF
-   - 常见错误：
-     * 413 - 文件过大
-     * 415 - 不支持的文件类型
-     * 507 - 存储空间不足
+4. **API认证问题**
+   - 检查Token格式
+   - 验证密钥配置
+   - 确认过期时间设置
 
-5. **机器学习服务问题**：
-   - 确保CUDA正确安装（如果使用GPU）
-   - 检查模型文件是否完整
-   - 验证OCR服务状态
-   - 常见问题：
-     * CUDA out of memory - 减小batch_size
-     * Model not found - 检查模型路径
-     * OCR服务超时 - 增加超时设置
+### 错误码说明
 
-6. **LLM服务连接问题**：
-   - 验证API密钥和基础URL
-   - 检查网络连接状态
-   - 确认模型可用性
-   - 常见错误：
-     * 429 - 请求频率限制
-     * 503 - LLM服务不可用
-     * 504 - 请求超时
+| 错误码 | 描述 | 解决方案 |
+|--------|------|----------|
+| DB001 | 数据库连接失败 | 检查数据库配置 |
+| AUTH001 | 认证失败 | 验证Token |
+| FILE001 | 文件上传失败 | 检查文件大小和类型 |
+| API001 | API调用失败 | 检查请求参数 |
 
-## 优化与监控
+## 性能优化
 
-### 日志管理
+### 数据库优化
 
-日志配置位于 `app/core/config.py`，支持以下功能：
+1. **索引优化**
+   ```sql
+   CREATE INDEX idx_questions_user_id ON questions(user_id);
+   CREATE INDEX idx_knowledge_points_subject ON knowledge_points(subject);
+   ```
 
-```python
-# 日志级别设置
-LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+2. **查询优化**
+   ```sql
+   -- 使用子查询优化
+   EXPLAIN ANALYZE SELECT * FROM questions WHERE user_id IN (SELECT id FROM users WHERE active = true);
+   ```
 
-# 日志输出位置
-LOG_FILE = "logs/app.log"
+### 缓存策略
 
-# 日志格式
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+1. **Redis缓存配置**
+   ```python
+   CACHE_TTL = 3600  # 缓存过期时间（秒）
+   CACHE_PREFIX = "gradnote:"  # 缓存键前缀
+   ```
 
-# 日志轮转
-LOG_ROTATION = "500 MB"
-```
+2. **缓存使用示例**
+   ```python
+   async def get_cached_data(key: str):
+       cached = await redis.get(f"{CACHE_PREFIX}{key}")
+       return json.loads(cached) if cached else None
+   ```
 
-### 性能优化
+### 并发处理
 
-1. **数据库优化**：
-   - 使用数据库连接池
-   - 优化查询索引
-   - 定期VACUUM
+1. **异步任务**
+   ```python
+   from celery import Celery
+   
+   celery = Celery('tasks', broker='redis://localhost:6379/0')
+   
+   @celery.task
+   def process_image(image_path: str):
+       # 处理图片的代码
+       pass
+   ```
 
-2. **缓存策略**：
-   - Redis缓存热点数据
-   - 图片缓存
-   - API响应缓存
+2. **连接池配置**
+   ```python
+   DATABASE_POOL_SIZE = 20
+   DATABASE_POOL_OVERFLOW = 10
+   DATABASE_POOL_TIMEOUT = 30
+   ```
 
-3. **并发处理**：
-   - 使用异步任务队列
-   - 合理设置worker数量
-   - 启用协程池
+## 贡献指南
 
-### 监控指标
+1. Fork项目
+2. 创建特性分支
+3. 提交更改
+4. 推送到分支
+5. 创建Pull Request
 
-1. **系统监控**：
-   - CPU使用率
-   - 内存占用
-   - 磁盘I/O
-   - 网络流量
+### 开发流程
 
-2. **应用监控**：
-   - API响应时间
-   - 请求成功率
-   - 并发用户数
-   - 错误率统计
+1. 领取或创建issue
+2. 本地开发和测试
+3. 提交代码审查
+4. 合并到主分支
+
+### 文档维护
+
+1. 及时更新API文档
+2. 编写详细的注释
+3. 维护README文档
+4. 记录重要的更改
