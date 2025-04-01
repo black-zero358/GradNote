@@ -6,6 +6,9 @@
 - **API版本**: v1
 - **内容类型**: application/json（除非特别说明，如文件上传等）
 - **认证方式**: Bearer Token（JWT）
+- **OpenAPI文档**: `/openapi.json`
+- **Swagger UI**: `/docs`
+- **ReDoc**: `/redoc`
 
 ## 目录
 
@@ -39,6 +42,7 @@
 - **状态码**:
   - `200`: 登录成功
   - `401`: 用户名或密码错误
+  - `422`: 请求参数验证错误
 
 ### 用户注册
 
@@ -65,6 +69,7 @@
 - **状态码**:
   - `200`: 注册成功
   - `400`: 用户名或邮箱已存在
+  - `422`: 请求参数验证错误
 
 ## 错题API
 
@@ -78,6 +83,7 @@
   ```json
   {
     "content": "string",
+    "subject": "string", // 可选
     "solution": "string", // 可选
     "remarks": "string",  // 可选
     "image_url": "string" // 可选
@@ -89,6 +95,7 @@
     "id": "integer",
     "user_id": "integer",
     "content": "string",
+    "subject": "string",
     "solution": "string",
     "remarks": "string",
     "image_url": "string",
@@ -97,6 +104,7 @@
   ```
 - **状态码**:
   - `200`: 创建成功
+  - `422`: 请求参数验证错误
 
 ### 获取错题列表
 
@@ -114,6 +122,7 @@
       "id": "integer",
       "user_id": "integer",
       "content": "string",
+      "subject": "string",
       "solution": "string",
       "remarks": "string",
       "image_url": "string",
@@ -123,6 +132,7 @@
   ```
 - **状态码**:
   - `200`: 获取成功
+  - `422`: 请求参数验证错误
 
 ### 获取错题详情
 
@@ -138,6 +148,7 @@
     "id": "integer",
     "user_id": "integer",
     "content": "string",
+    "subject": "string",
     "solution": "string",
     "remarks": "string",
     "image_url": "string",
@@ -147,6 +158,7 @@
 - **状态码**:
   - `200`: 获取成功
   - `404`: 错题不存在
+  - `422`: 请求参数验证错误
 
 ### 更新错题
 
@@ -171,6 +183,7 @@
     "id": "integer",
     "user_id": "integer",
     "content": "string",
+    "subject": "string",
     "solution": "string",
     "remarks": "string",
     "image_url": "string",
@@ -180,6 +193,7 @@
 - **状态码**:
   - `200`: 更新成功
   - `404`: 错题不存在
+  - `422`: 请求参数验证错误
 
 ### 删除错题
 
@@ -195,6 +209,7 @@
     "id": "integer",
     "user_id": "integer",
     "content": "string",
+    "subject": "string",
     "solution": "string",
     "remarks": "string",
     "image_url": "string",
@@ -204,6 +219,7 @@
 - **状态码**:
   - `200`: 删除成功
   - `404`: 错题不存在
+  - `422`: 请求参数验证错误
 
 ### 通过图片创建错题
 
@@ -222,6 +238,7 @@
       "id": "integer",
       "user_id": "integer",
       "content": "string",
+      "subject": "string",
       "solution": "string",
       "remarks": "string",
       "image_url": "string",
@@ -233,6 +250,7 @@
 - **状态码**:
   - `200`: 创建成功
   - `400`: 文件类型错误
+  - `422`: 请求参数验证错误
   - `500`: 图像处理错误
 
 ## 知识点API
@@ -263,6 +281,7 @@
   ```
 - **状态码**:
   - `200`: 查询成功
+  - `422`: 请求参数验证错误
 
 ### 搜索知识点
 
@@ -294,6 +313,7 @@
   ```
 - **状态码**:
   - `200`: 搜索成功
+  - `422`: 请求参数验证错误
 
 ### 获取热门知识点
 
@@ -319,6 +339,7 @@
   ```
 - **状态码**:
   - `200`: 获取成功
+  - `422`: 请求参数验证错误
 
 ### 获取所有科目
 
@@ -349,6 +370,7 @@
   ```
 - **状态码**:
   - `200`: 获取成功
+  - `422`: 请求参数验证错误
 
 ### 获取指定章节的小节
 
@@ -366,6 +388,7 @@
   ```
 - **状态码**:
   - `200`: 获取成功
+  - `422`: 请求参数验证错误
 
 ### 获取知识点详情
 
@@ -390,6 +413,7 @@
 - **状态码**:
   - `200`: 获取成功
   - `404`: 知识点不存在
+  - `422`: 请求参数验证错误
 
 ### 标记知识点
 
@@ -415,6 +439,7 @@
 - **状态码**:
   - `200`: 标记成功
   - `404`: 知识点不存在
+  - `422`: 请求参数验证错误
 
 ### 创建用户知识点标记
 
@@ -442,6 +467,7 @@
 - **状态码**:
   - `201`: 创建成功
   - `404`: 知识点不存在
+  - `422`: 请求参数验证错误
 
 ### 获取用户标记列表
 
@@ -463,6 +489,39 @@
   ```
 - **状态码**:
   - `200`: 获取成功
+
+### 创建知识点
+
+- **URL**: `/knowledge/`
+- **方法**: `POST`
+- **描述**: 创建新的知识点
+- **认证**: 需要Bearer Token
+- **请求体**:
+  ```json
+  {
+    "subject": "string",
+    "chapter": "string",
+    "section": "string",
+    "item": "string",
+    "details": "string" // 可选
+  }
+  ```
+- **响应**:
+  ```json
+  {
+    "id": "integer",
+    "subject": "string",
+    "chapter": "string",
+    "section": "string",
+    "item": "string",
+    "details": "string",
+    "mark_count": "integer",
+    "created_at": "datetime"
+  }
+  ```
+- **状态码**:
+  - `201`: 创建成功
+  - `422`: 请求参数验证错误
 
 ## 解题API
 
@@ -514,6 +573,7 @@
 - **状态码**:
   - `200`: 解答成功
   - `404`: 错题不存在
+  - `422`: 请求参数验证错误
 
 ### 从错题提取知识点
 
@@ -553,6 +613,7 @@
 - **状态码**:
   - `200`: 提取成功
   - `404`: 错题不存在
+  - `422`: 请求参数验证错误
 
 ## 图像处理API
 
@@ -571,10 +632,22 @@
     "status": "string",
     "text": "string",
     "image_url": "string",
-    "message": "string"
+    "message": "string",
+    "error_code": "string"
   }
   ```
 - **状态码**:
   - `200`: 处理成功
   - `400`: 文件类型错误
+  - `422`: 请求参数验证错误
   - `500`: 图像处理错误
+
+**错误代码说明**:
+- `IMAGE_SIZE_EXCEEDED`: 图像过大
+- `IMAGE_FORMAT_ERROR`: 不支持的图像格式
+- `INVALID_IMAGE_DATA`: 无效的图像数据
+- `INVALID_IMAGE_PATH`: 图像路径无效
+- `IMAGE_READ_ERROR`: 图像读取错误
+- `API_ERROR`: 图像处理API错误
+- `PROCESSING_ERROR`: 图像处理失败
+- `UNKNOWN_ERROR`: 未知错误
