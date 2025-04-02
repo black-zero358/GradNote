@@ -4,7 +4,7 @@ import base64
 import logging
 import re
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Literal
 
 from langchain_openai import ChatOpenAI
 from langchain.schema.messages import HumanMessage, SystemMessage
@@ -14,6 +14,12 @@ from langfuse.callback import CallbackHandler
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 OPENAI_VLM_MODEL = os.getenv("OPENAI_VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
+
+# 读取不同模式的提示语
+VLM_EXTRACT_QUESTION_PROMPT = os.getenv("VLM_EXTRACT_QUESTION_PROMPT", "请提取这张错题图片中的文本内容，包括题目、选项等。保持原始格式，不要遗漏任何文字和符号。")
+VLM_EXTRACT_ANSWER_PROMPT = os.getenv("VLM_EXTRACT_ANSWER_PROMPT", "你是一个专业的答案提取助手，任务是从错题图片中准确提取答案部分。如果图片中没有明确的答案，请回复None。请不要提取题目内容，只关注答案部分。")
+VLM_EXTRACT_QUESTION_SYSTEM_PROMPT = os.getenv("VLM_EXTRACT_QUESTION_SYSTEM_PROMPT", "你是一个专业的OCR助手，任务是从图片中准确提取文字内容，特别是识别数学公式、物理符号等学科内容。请尽可能保持原始格式，完整输出所有文本内容。")
+VLM_EXTRACT_ANSWER_SYSTEM_PROMPT = os.getenv("VLM_EXTRACT_ANSWER_SYSTEM_PROMPT", "你是一个专业的OCR助手，任务是从图片中准确提取文字内容，特别是识别数学公式、物理符号等学科内容。请尽可能保持原始格式，完整输出所有文本内容。")
 
 # 默认的最大图片大小 (20MB)
 DEFAULT_MAX_IMAGE_SIZE = 20 * 1024 * 1024
@@ -246,12 +252,13 @@ class ImageProcessor:
             logger.error(f"读取图片文件时出错: {str(e)}")
             raise ImageReadError(validated_path, str(e))
     
-    def process_image_file(self, image_path: str) -> str:
+    def process_image_file(self, image_path: str, mode: Literal["question", "answer"] = "question") -> str:
         """
         处理图像文件并提取文本
         
         Args:
             image_path: 图像文件路径
+            mode: 处理模式，"question"提取题目，"answer"提取答案
             
         Returns:
             提取的文本内容
@@ -272,7 +279,7 @@ class ImageProcessor:
             base64_image = base64.b64encode(image_data).decode('utf-8')
             
             # 调用VLM提取文本
-            return self.process_image_base64(base64_image, mime_type)
+            return self.process_image_base64(base64_image, mime_type, mode)
         except (ImagePathError, ImageSizeExceededError, ImageFormatError, ImageReadError, InvalidBase64Error) as e:
             # 已知的特定异常，直接抛出
             raise
@@ -280,13 +287,14 @@ class ImageProcessor:
             logger.error(f"处理图像文件时出错: {str(e)}")
             raise ImageProcessingAPIError(str(e))
     
-    def process_image_base64(self, base64_image: str, mime_type: str = 'image/png') -> str:
+    def process_image_base64(self, base64_image: str, mime_type: str = 'image/png', mode: Literal["question", "answer"] = "question") -> str:
         """
         处理base64编码的图像并提取文本
         
         Args:
             base64_image: base64编码的图像
             mime_type: 图像的MIME类型，默认为'image/png'
+            mode: 处理模式，"question"提取题目，"answer"提取答案
             
         Returns:
             提取的文本内容
@@ -310,19 +318,28 @@ class ImageProcessor:
             )
         
         try:
+            # 根据模式选择适当的提示语
+            if mode == "question":
+                system_prompt = VLM_EXTRACT_QUESTION_SYSTEM_PROMPT
+                user_prompt = VLM_EXTRACT_QUESTION_PROMPT
+            else:  # mode == "answer"
+                system_prompt = VLM_EXTRACT_ANSWER_SYSTEM_PROMPT
+                user_prompt = VLM_EXTRACT_ANSWER_PROMPT
+            
             # 创建消息
             messages = [
-                SystemMessage(content="你是一个专业的OCR助手，任务是从图片中准确提取文字内容，特别是识别数学公式、物理符号等学科内容。请尽可能保持原始格式，完整输出所有文本内容。"),
+                SystemMessage(content=system_prompt),
                 HumanMessage(
                     content=[
                         {
                             "type": "text", 
-                            "text": "请提取这张错题图片中的文本内容，包括题目、选项等。保持原始格式，不要遗漏任何文字和符号。"
+                            "text": user_prompt
                         },
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:{mime_type};base64,{base64_image}"
+                                "url": f"data:{mime_type};base64,{base64_image}",
+                                "detail": "high"
                             }
                         }
                     ]
@@ -338,12 +355,13 @@ class ImageProcessor:
             logger.error(f"处理base64图像时出错: {str(e)}")
             raise ImageProcessingAPIError(str(e))
     
-    def process_image_bytes(self, image_bytes: bytes) -> str:
+    def process_image_bytes(self, image_bytes: bytes, mode: Literal["question", "answer"] = "question") -> str:
         """
         处理图像字节数据并提取文本
         
         Args:
             image_bytes: 图像的字节数据
+            mode: 处理模式，"question"提取题目，"answer"提取答案
             
         Returns:
             提取的文本内容
@@ -369,7 +387,7 @@ class ImageProcessor:
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             
             # 调用VLM提取文本
-            return self.process_image_base64(base64_image, mime_type)
+            return self.process_image_base64(base64_image, mime_type, mode)
         except (ImageSizeExceededError, InvalidBase64Error) as e:
             # 已知的特定异常，直接抛出
             raise
