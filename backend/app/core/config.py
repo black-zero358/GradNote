@@ -46,11 +46,9 @@ class Settings(BaseSettings):
     LLM_MODEL: str = os.getenv("LLM_MODEL", "deepseek-r1-250120")
     VLM_MODEL: str = os.getenv("VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
     
-    # LangSmith配置
-    LANGCHAIN_TRACING_V2: str = os.getenv("LANGCHAIN_TRACING_V2", "false")
-    LANGCHAIN_API_KEY: str = os.getenv("LANGCHAIN_API_KEY", "")
-    LANGSMITH_TRACING: str = os.getenv("LANGSMITH_TRACING", "false")
-    LANGSMITH_API_KEY: str = os.getenv("LANGSMITH_API_KEY", "")
+    # LANGFUSE配置
+    LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
     
     # OpenAI格式配置
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
