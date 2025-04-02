@@ -111,10 +111,9 @@ SECRET_KEY=your-secret-key-here
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# LangSmith配置
-LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=your-langsmith-api-key
-LANGSMITH_PROJECT=gradnote
+# LANGFUSE配置
+LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
+LANGFUSE_SECRET_KEY=your-langfuse-secret-key
 
 # LLM设置
 OPENAI_API_KEY=your-openai-api-key
