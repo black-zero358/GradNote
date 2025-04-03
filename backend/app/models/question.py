@@ -10,6 +10,6 @@ class WrongQuestion(Base):
     subject = Column(String(50), nullable=True)
     content = Column(Text, nullable=False)
     solution = Column(Text)
-    remarks = Column(Text)
+    answer = Column(Text)
     image_url = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now()) 

@@ -6,7 +6,7 @@ class QuestionBase(BaseModel):
     content: str
     subject: Optional[str] = None
     solution: Optional[str] = None
-    remarks: Optional[str] = None
+    answer: Optional[str] = None
 
 class QuestionCreate(QuestionBase):
     image_url: Optional[str] = None
@@ -15,10 +15,12 @@ class QuestionImageUpload(BaseModel):
     file_content: bytes
 
 class QuestionUpdate(BaseModel):
+    subject: Optional[str] = None
     content: Optional[str] = None
     solution: Optional[str] = None
-    remarks: Optional[str] = None
+    answer: Optional[str] = None
     image_url: Optional[str] = None
+
 
 class Question(QuestionBase):
     id: int

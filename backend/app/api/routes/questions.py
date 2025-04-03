@@ -1,6 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
+import logging
 from app.api.deps import get_db, get_current_active_user
 from app.models.user import User
 from app.models.question import WrongQuestion
@@ -9,6 +10,7 @@ from app.services import image as image_service
 from app.api.routes.image import process_image
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=Question)
 async def create_question(
@@ -22,7 +24,7 @@ async def create_question(
         content=question_in.content,
         subject=question_in.subject,
         solution=question_in.solution,
-        remarks=question_in.remarks,
+        answer=question_in.answer,
         image_url=question_in.image_url
     )
     db.add(db_question)
@@ -82,12 +84,19 @@ async def update_question(
             detail="找不到该错题"
         )
     
-    # 更新字段
-    for field, value in question_in.dict(exclude_unset=True).items():
+    # 更新字段，只更新非空字段
+    update_data = question_in.dict(exclude_unset=True)
+    # 过滤掉值为None和空字符串的字段
+    update_data = {field: value for field, value in update_data.items() if value is not None and value != ""}
+    
+    logger.info(f"更新错题 ID: {question_id}, 用户ID: {current_user.id}, 更新字段: {update_data}")
+    
+    for field, value in update_data.items():
         setattr(question, field, value)
     
     db.commit()
     db.refresh(question)
+    logger.info(f"错题 ID: {question_id} 更新成功")
     return question
 
 @router.delete("/{question_id}", response_model=Question)
@@ -182,7 +191,8 @@ async def create_question_from_image(
             "user_id": db_question.user_id,
             "content": db_question.content,
             "solution": db_question.solution,
-            "remarks": db_question.remarks,
+            "answer": db_question.answer,
+            "subject": db_question.subject,
             "image_url": db_question.image_url,
             "created_at": db_question.created_at
         }
