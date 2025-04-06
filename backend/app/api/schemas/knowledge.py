@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
@@ -54,4 +54,16 @@ class Mark(MarkCreate):
 
 class KnowledgePointWithRelation(KnowledgePoint):
     relation_id: int
-    question_id: int 
+    question_id: int
+
+# 新增的Schema类，用于题目知识点分析
+class KnowledgeAnalyzeRequest(BaseModel):
+    question_text: str
+
+class KnowledgeCategory(BaseModel):
+    subject: str
+    chapter: str
+    section: str
+
+class KnowledgeAnalyzeResponse(BaseModel):
+    categories: List[KnowledgeCategory]

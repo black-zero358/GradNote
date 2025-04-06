@@ -227,6 +227,34 @@ def get_user_marks(db: Session, user_id: int) -> List[UserMark]:
     """
     return db.query(UserMark).filter(UserMark.user_id == user_id).all()
 
+def get_all_categories_csv(db: Session) -> str:
+    """
+    获取所有知识点类别的CSV格式表示
+    
+    Parameters:
+    - db: 数据库会话
+    
+    Returns:
+    - CSV格式的知识点类别字符串
+    """
+    # 获取所有唯一的科目-章节-小节组合
+    query = db.query(
+        KnowledgePoint.subject,
+        KnowledgePoint.chapter,
+        KnowledgePoint.section
+    ).distinct().order_by(
+        KnowledgePoint.subject,
+        KnowledgePoint.chapter,
+        KnowledgePoint.section
+    )
+    
+    # 生成CSV格式的表头和内容
+    result = "科目,章节,小节\n"
+    for subject, chapter, section in query.all():
+        result += f"{subject},{chapter},{section}\n"
+    
+    return result
+
 def create_knowledge_point(
     db: Session,
     knowledge_point_data: Dict[str, Any]

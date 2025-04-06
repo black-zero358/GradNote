@@ -1,5 +1,13 @@
 # GradNote - 错题知识点管理系统后端开发路线图
 
+## 实施进度摘要 
+
+- ✅ 阶段1: Langfuse集成与基础设施 - 已完成
+- ✅ 阶段2: 知识点检索模块 - 已完成
+- ⏳ 阶段3: 解题模块 - 待实施
+- ⏳ 阶段4: 知识点标记模块 - 待实施
+- ⏳ 阶段5: API版本化与测试 - 待实施
+
 ## 重构计划 (Version 2.0)
 
 ### 背景与目标
@@ -59,10 +67,10 @@ flowchart TD
 - 保留现有接口以确保向后兼容
 
 #### 1.2 知识点模块 (`/api/v1/knowledge`)
-- **新增 `POST /analyze-from-question`**
+- **新增 `POST /analyze-from-question`** ✅
   - 实现题目文本分析，返回可能的知识点类别
   - Schema: `KnowledgeAnalyzeRequest`, `KnowledgeAnalyzeResponse`
-  - 返回Langfuse trace_id用于监控
+
 
 - **优化 `GET /search`**
   - 基于现有知识点检索功能优化查询性能
@@ -83,7 +91,7 @@ flowchart TD
   - 使用LangGraph优化解题流程
   - 添加审查和重试机制
   - Schema: `SolveRequest`, `SolveResponse`
-  - 返回Langfuse trace_id用于监控
+
 
 ### 2. 数据模型 (`/backend/app/models/`)
 
@@ -96,14 +104,14 @@ flowchart TD
 
 ### 3. LLM服务层 (`/backend/app/llm_services/`)
 
-#### 3.1 基础服务
-- **创建 `base.py`**
+#### 3.1 基础服务 ✅
+- **创建 `base.py`** ✅
   - 实现LLM工厂方法
   - 集成Langfuse回调
   - 配置管理
 
-#### 3.2 知识点检索服务
-- **创建 `knowledge_retriever/`**
+#### 3.2 知识点检索服务 ✅
+- **创建 `knowledge_retriever/`** ✅
   - `__init__.py`
   - `retriever.py`: 实现 `LLMKnowledgeRetriever` 类
     - `analyze_knowledge_category()`: 分析题目所属知识点类别
@@ -122,10 +130,10 @@ flowchart TD
 
 ### 4. 服务层 (`/backend/app/services/`)
 
-#### 4.1 知识点服务
-- **优化 `knowledge.py`**
-  - 添加 `get_all_categories_csv()`: 获取知识点类别CSV
-  - 优化 `search_knowledge_points()`: 多条件查询
+#### 4.1 知识点服务 ✅
+- **优化 `knowledge.py`** ✅
+  - 添加 `get_all_categories_csv()`: 获取知识点类别CSV ✅
+  - 优化 `search_knowledge_points()`: 多条件查询 ✅
 
 #### 4.2 知识点标记服务
 - **创建 `knowledge_marking.py`**
@@ -141,13 +149,21 @@ flowchart TD
 
 分阶段实施重构，确保系统稳定性：
 
-#### 阶段1: Langfuse集成与基础设施
+#### 阶段1: Langfuse集成与基础设施 ✅ 
 - 添加LLM基础服务和Langfuse集成
+  - ✅ 创建base.py提供工厂方法
+  - ✅ 集成Langfuse监控
+  - ✅ 提供跟踪ID管理
 
 
-#### 阶段2: 知识点检索模块
+#### 阶段2: 知识点检索模块 ✅ 
 - 实现知识点类别分析
+  - ✅ 创建LLMKnowledgeRetriever类
+  - ✅ 实现analyze_knowledge_category方法
+  - ✅ 创建知识点类别CSV转换功能
 - 优化知识点检索
+  - ✅ 添加/analyze-from-question API端点
+  - ✅ 创建相关Schema
 
 
 #### 阶段3: 解题模块
@@ -167,37 +183,7 @@ flowchart TD
 
 ### 6. 代码示例
 
-#### Langfuse集成示例
-```python
-# app/llm_services/base.py
-import os
-from langfuse.callback import CallbackHandler
-from langchain_openai import ChatOpenAI
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
-OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-r1-250120")
-
-LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
-LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
-LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
-
-def get_llm(model_name=None, tags=None):
-    langfuse_handler = CallbackHandler(
-        secret_key=LANGFUSE_SECRET_KEY,
-        public_key=LANGFUSE_PUBLIC_KEY,
-        host=LANGFUSE_HOST
-    )
-    
-    return ChatOpenAI(
-        api_key=OPENAI_API_KEY,
-        base_url=OPENAI_API_BASE,
-        model_name=model_name or OPENAI_LLM_MODEL,
-        callbacks=[langfuse_handler]
-    )
-```
-
-#### 知识点检索示例
+#### 知识点检索示例 ✅
 ```python
 # app/llm_services/knowledge_retriever/retriever.py
 import json
@@ -207,7 +193,7 @@ from app.llm_services.base import get_llm
 class LLMKnowledgeRetriever:
     def __init__(self, llm=None):
         self.llm = llm or get_llm()
-        self.trace_id = None
+        
     
     def analyze_knowledge_category(self, question_text: str, categories_csv: str) -> List[Dict[str, str]]:
         """分析题目所属的知识点类别"""
@@ -240,6 +226,7 @@ class LLMKnowledgeRetriever:
 from typing import Dict, List, Optional, Literal, TypedDict
 from langgraph.graph import StateGraph, END
 from app.llm_services.base import get_llm
+from langfuse.callback import CallbackHandler
 
 class SolveState(TypedDict):
     """解题工作流状态类型"""
@@ -254,7 +241,7 @@ class SolveState(TypedDict):
 class LLMSolvingWorkflow:
     def __init__(self, llm=None):
         self.llm = llm or get_llm()
-        self.trace_id = None
+        
         self.graph = self._build_graph()
     
     # 解题节点实现...

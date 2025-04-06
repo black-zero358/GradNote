@@ -10,10 +10,14 @@ from app.api.schemas.knowledge import (
     KnowledgePointSearch,
     KnowledgeStructure,
     MarkCreate,
-    Mark
+    Mark,
+    KnowledgeAnalyzeRequest,
+    KnowledgeAnalyzeResponse,
+    KnowledgeCategory
 )
 from app.models.user import User
 from app.models.knowledge import KnowledgePoint as KnowledgePointModel
+from app.llm_services import LLMKnowledgeRetriever
 
 router = APIRouter()
 
@@ -184,4 +188,46 @@ async def create_knowledge_point(
     return knowledge_service.create_knowledge_point(
         db=db,
         knowledge_point_data=knowledge_point_data.model_dump()
+    )
+
+@router.post("/analyze-from-question", response_model=KnowledgeAnalyzeResponse)
+async def analyze_knowledge_from_question(
+    request: KnowledgeAnalyzeRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    分析题目文本，返回可能的知识点类别
+    参数：
+        question_text: 题目文本
+
+    返回：
+        categories: 知识点类别的列表
+
+    
+    """
+    # 获取所有知识点类别的CSV格式
+    categories_csv = knowledge_service.get_all_categories_csv(db)
+    
+    # 创建知识点检索器
+    retriever = LLMKnowledgeRetriever()
+    
+    # 分析题目
+    categories_data = retriever.analyze_knowledge_category(
+        question_text=request.question_text,
+        categories_csv=categories_csv
+    )
+    
+    # 转换为响应格式
+    categories = [
+        KnowledgeCategory(
+            subject=cat["subject"],
+            chapter=cat["chapter"],
+            section=cat["section"]
+        )
+        for cat in categories_data
+    ]
+    
+    return KnowledgeAnalyzeResponse(
+        categories=categories,
+
     ) 
