@@ -171,15 +171,23 @@ flowchart TD
 ```python
 # app/llm_services/base.py
 import os
-from langchain_openai import ChatOpenAI
 from langfuse.callback import CallbackHandler
+from langchain_openai import ChatOpenAI
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-r1-250120")
 
-def get_llm(model_name=None):
-    langfuse_handler = CallbackHandler()
+LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
+LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+
+def get_llm(model_name=None, tags=None):
+    langfuse_handler = CallbackHandler(
+        secret_key=LANGFUSE_SECRET_KEY,
+        public_key=LANGFUSE_PUBLIC_KEY,
+        host=LANGFUSE_HOST
+    )
     
     return ChatOpenAI(
         api_key=OPENAI_API_KEY,
