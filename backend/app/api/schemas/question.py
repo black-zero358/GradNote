@@ -7,6 +7,7 @@ class QuestionBase(BaseModel):
     subject: Optional[str] = None
     solution: Optional[str] = None
     answer: Optional[str] = None
+    remark: Optional[str] = None
 
 class QuestionCreate(QuestionBase):
     image_url: Optional[str] = None
@@ -19,6 +20,7 @@ class QuestionUpdate(BaseModel):
     content: Optional[str] = None
     solution: Optional[str] = None
     answer: Optional[str] = None
+    remark: Optional[str] = None
     image_url: Optional[str] = None
 
 

@@ -25,7 +25,8 @@ async def create_question(
         subject=question_in.subject,
         solution=question_in.solution,
         answer=question_in.answer,
-        image_url=question_in.image_url
+        image_url=question_in.image_url,
+        remark=question_in.remark
     )
     db.add(db_question)
     db.commit()
@@ -194,6 +195,7 @@ async def create_question_from_image(
             "answer": db_question.answer,
             "subject": db_question.subject,
             "image_url": db_question.image_url,
+            "remark": db_question.remark,
             "created_at": db_question.created_at
         }
         

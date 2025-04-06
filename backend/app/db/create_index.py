@@ -36,6 +36,12 @@ def create_indexes():
         """
         CREATE INDEX IF NOT EXISTS idx_user_marks_user_knowledge 
         ON user_marks(user_id, knowledge_point_id)
+        """,
+        
+        # 错题备注索引 - 提高备注内容搜索性能
+        """
+        CREATE INDEX IF NOT EXISTS idx_wrong_questions_remark 
+        ON wrong_questions USING gin(to_tsvector('chinese', remark))
         """
     ]
     
@@ -43,8 +49,11 @@ def create_indexes():
     with engine.connect() as connection:
         try:
             for index_sql in indexes:
-                connection.execute(text(index_sql))
-                logger.info(f"执行索引SQL: {index_sql}")
+                try:
+                    connection.execute(text(index_sql))
+                    logger.info(f"执行索引SQL: {index_sql}")
+                except Exception as e:
+                    logger.warning(f"索引创建出错: {e}，可能是GIN索引不支持或remark字段不存在")
             
             connection.commit()
             logger.info("所有数据库索引创建成功！")
