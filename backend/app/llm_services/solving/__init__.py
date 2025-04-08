@@ -1,5 +1,5 @@
-from app.llm_services.solving.workflow import SolveWorkflow
+from .workflow import LLMSolvingWorkflow
 
 __all__ = [
-    "SolveWorkflow"
+    "LLMSolvingWorkflow"
 ] 

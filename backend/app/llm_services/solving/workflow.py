@@ -1,298 +1,307 @@
-import json
 import os
-from typing import Dict, List, Optional, Literal, TypedDict
-from langgraph.graph import StateGraph, END
-from langchain.schema import Document
+import json
+from typing import Dict, List, Optional, Literal, TypedDict, Any, Tuple
 from langchain_openai import ChatOpenAI
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import SystemMessage, HumanMessage
 from langfuse.callback import CallbackHandler
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 从环境变量获取配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-r1-250120")
 
+# 从环境变量获取特定任务的模型配置，如果未设置，则使用OPENAI_LLM_MODEL
+LLM_SOLVING_MODEL = os.getenv("LLM_SOLVING_MODEL", OPENAI_LLM_MODEL)
+LLM_REVIEW_MODEL = os.getenv("LLM_REVIEW_MODEL", OPENAI_LLM_MODEL)
+
+# 从环境变量获取特定任务的提示词配置
+LLM_SOLVING_PROMPT = os.getenv("LLM_SOLVING_PROMPT", "你是一个专业的解题助手，能够使用已知的知识点来解答学生的题目。")
+LLM_REVIEW_PROMPT = os.getenv("LLM_REVIEW_PROMPT", "你是一个专业的解题审查员，需要检查解题过程是否正确，并与正确答案对比。")
+
 class SolveState(TypedDict):
     """解题工作流状态类型"""
-    question: str
-    knowledge_points: List[Document]
-    is_complete: bool
-    solution: Optional[str]
-    review_passed: Optional[bool]
-    review_reason: Optional[str]
-    attempts: int
-    existing_knowledge_points: Optional[List[Document]]
-    new_knowledge_points: Optional[List[Dict]]
-    knowledge_complete_after_extraction: Optional[bool]
+    question: str  # 题目内容
+    knowledge_points: List[Dict[str, str]]  # 相关知识点列表
+    correct_answer: Optional[str]  # 正确答案
+    solution: Optional[str]  # 解题过程
+    review_passed: Optional[bool]  # 审查是否通过
+    review_reason: Optional[str]  # 审查意见
+    attempts: int  # 尝试次数
+    trace_id: Optional[str]  # Langfuse追踪ID
+    error: Optional[str]  # 错误信息
 
-class SolveWorkflow:
-    """解题工作流类"""
+class LLMSolvingWorkflow:
+    """
+    基于LangGraph的解题工作流
     
-    def __init__(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model_name: Optional[str] = None):
+    实现完整的解题流程，包括：
+    1. 使用LLM解题
+    2. 审查解题过程与结果
+    3. 如果审查不通过，重试解题
+    """
+    
+    def __init__(self, 
+                 api_key: Optional[str] = None, 
+                 api_base: Optional[str] = None, 
+                 solving_model: Optional[str] = None,
+                 review_model: Optional[str] = None):
         """
         初始化解题工作流
         
         Args:
             api_key: API密钥，默认从环境变量获取
             api_base: API基础URL，默认从环境变量获取
-            model_name: 模型名称，默认从环境变量获取
+            solving_model: 解题模型名称，默认从环境变量获取
+            review_model: 审查模型名称，默认从环境变量获取
         """
-        self.langfuse_handler = CallbackHandler()
-        self.llm = ChatOpenAI(
+        # 初始化解题LLM
+        self.solving_llm = ChatOpenAI(
             api_key=api_key or OPENAI_API_KEY,
             base_url=api_base or OPENAI_API_BASE,
-            model_name=model_name or OPENAI_LLM_MODEL,
-            callbacks=[self.langfuse_handler]
+            model_name=solving_model or LLM_SOLVING_MODEL
         )
-        self.workflow = self._build_workflow()
+        
+        # 初始化审查LLM
+        self.review_llm = ChatOpenAI(
+            api_key=api_key or OPENAI_API_KEY,
+            base_url=api_base or OPENAI_API_BASE,
+            model_name=review_model or LLM_REVIEW_MODEL
+        )
+        
+        # 构建工作流图
+        self.graph = self._build_graph()
     
-    def _solve_question(self, state: SolveState) -> SolveState:
-        """解题节点"""
-        question = state["question"]
-        knowledge_points = state["knowledge_points"]
-        is_complete = state["is_complete"]
-        attempts = state["attempts"]
-        
-        # 根据知识点完备性选择解题策略
-        if not knowledge_points:
-            prompt = f"""请解答以下问题：
-            
-            问题：{question}
-            
-            注意：这个问题没有相关的知识点参考，请基于你的知识解答。
-            """
-        elif not is_complete:
-            knowledge_text = "\n".join([
-                f"- {doc.metadata['subject']}/{doc.metadata['chapter']}/{doc.metadata['section']}: {doc.metadata['item']}\n  {doc.page_content}"
-                for doc in knowledge_points
-            ])
-            
-            prompt = f"""请依据以下知识点解答问题：
-            
-            问题：{question}
-            
-            参考知识点（不完备）：
-            {knowledge_text}
-            
-            注意：提供的知识点可能不完整，请补充必要的知识解答问题。
-            """
-        else:
-            knowledge_text = "\n".join([
-                f"- {doc.metadata['subject']}/{doc.metadata['chapter']}/{doc.metadata['section']}: {doc.metadata['item']}\n  {doc.page_content}"
-                for doc in knowledge_points
-            ])
-            
-            prompt = f"""请严格依据以下完整知识点解答问题：
-            
-            问题：{question}
-            
-            参考知识点（完备）：
-            {knowledge_text}
-            
-            注意：请确保你的解答完全基于提供的知识点。
-            """
-        
-        # 调用 LLM
-        solution = self.llm.invoke(prompt)
-        
-        # 更新状态
-        return {
-            **state,
-            "solution": solution.content,
-            "attempts": attempts + 1
-        }
-
-    def _review_solution(self, state: SolveState) -> SolveState:
-        """审查解题过程"""
-        question = state["question"]
-        solution = state["solution"]
-        knowledge_points = state["knowledge_points"]
-        
-        knowledge_text = "\n".join([
-            f"- {doc.metadata['subject']}/{doc.metadata['chapter']}/{doc.metadata['section']}: {doc.metadata['item']}"
-            for doc in knowledge_points
-        ])
-        
-        prompt = f"""请审查以下解题过程是否正确：
-        
-        问题：{question}
-        
-        相关知识点：
-        {knowledge_text}
-        
-        解题过程：
-        {solution}
-        
-        请评估：
-        1. 解题过程是否正确
-        2. 是否使用了正确的方法
-        3. 是否有计算错误
-        4. 是否有概念性错误
-        
-        回复时遵守以下格式：
-        {{
-            "passed": true/false,  # 是否通过审查
-            "reason": "审查理由"  # 简要说明理由
-        }}
+    def _solve_node(self, state: SolveState) -> SolveState:
         """
-        
-        try:
-            review_response = self.llm.invoke(prompt)
-            review_result = json.loads(review_response.content)
-            review_passed = review_result.get("passed", False)
-            review_reason = review_result.get("reason", "未提供理由")
-        except (json.JSONDecodeError, KeyError) as e:
-            review_passed = False
-            review_reason = f"解析错误: {str(e)}"
-
-        # 更新状态
-        return {
-            **state,
-            "review_passed": review_passed,
-            "review_reason": review_reason
-        }
-
-    def _mark_knowledge_points(self, state: SolveState) -> SolveState:
-        """知识点标记节点"""
-        # 只有当解题通过审查且知识点不完备时才进行知识点提取
-        if state["review_passed"] and not state["is_complete"]:
-            knowledge_result = self._process_knowledge_points(state)
-            
-            return {
-                **state,
-                "existing_knowledge_points": state["knowledge_points"],
-                "new_knowledge_points": knowledge_result,
-                "knowledge_complete_after_extraction": True if knowledge_result else state["is_complete"]
-            }
-        
-        # 如果知识点已完备或解题未通过审查，不进行知识点提取
-        return {
-            **state,
-            "existing_knowledge_points": state["knowledge_points"],
-            "new_knowledge_points": [],
-            "knowledge_complete_after_extraction": state["is_complete"]
-        }
-    
-    def _process_knowledge_points(self, state: SolveState) -> List[Dict]:
-        """
-        从解题过程中提取知识点
+        解题节点，使用LLM和知识点解答题目
         
         Args:
-            state: 解题状态
+            state: 当前工作流状态
             
         Returns:
-            提取的新知识点列表
+            更新后的工作流状态
         """
-        question_text = state["question"]
-        solution = state["solution"]
-        existing_knowledge_points = state["knowledge_points"]
-        
-        # 如果解题未通过审查，直接返回空列表
-        if not state.get("review_passed", False):
-            return []
-        
-        # 将已有知识点加入上下文，避免提取重复知识点
-        existing_points_text = "\n".join([
-            f"- {point.metadata['subject']}/{point.metadata['chapter']}/{point.metadata['section']}: "
-            f"{point.metadata['item']} - {point.page_content}"
-            for point in existing_knowledge_points
-        ]) if existing_knowledge_points else "无已有知识点"
-        
-        prompt = f"""请从以下解题过程中提取关键知识点，注意避免与已有知识点重复：
-        
-        题目：{question_text}
-        
-        解题过程：
-        {solution}
-        
-        已有知识点：
-        {existing_points_text}
-        
-        请以JSON格式列出额外需要的知识点（避免与已有知识点重复），包括：
-        - subject: 科目
-        - chapter: 章节
-        - section: 小节
-        - item: 具体知识点名称
-        - details: 知识点详细说明
-        
-        如果没有需要补充的知识点，请返回空数组 []
-        
-        例如：
-        [
-            {{
-                "subject": "高等数学",
-                "chapter": "一元函数微分学的应用",
-                "section": "单调性与极值的判断",
-                "item": "单调性的判别",
-                "details": "如果在区间I上，导数f'(x)>0，则f(x)在I上单调递增；如果f'(x)<0，则f(x)在I上单调递减。"
-            }}
-        ]
-        """
-        
-        # 调用LLM提取知识点
-        response = self.llm.invoke(prompt)
-        
-        # 解析JSON响应
         try:
-            extracted_points = json.loads(response.content)
-            return extracted_points if isinstance(extracted_points, list) else []
-        except json.JSONDecodeError:
-            return []
-
-    def _should_retry(self, state: SolveState) -> Literal["end", "retry"]:
-        """条件路由：决定是否重试解题"""
-        if state["review_passed"] or state["attempts"] >= 3:  # 通过审查或达到最大尝试次数
+            # 提取当前状态信息
+            question = state["question"]
+            knowledge_points = state["knowledge_points"]
+            attempts = state["attempts"]
+            
+            
+            
+            #构建csv格式的知识点文本
+            knowledge_text_csv = "科目,章节,小节,知识点,详情\n"
+            for idx, kp in enumerate(knowledge_points, 1):
+                knowledge_text_csv += f"{kp.get('subject', '')},{kp.get('chapter', '')},{kp.get('section', '')},{kp.get('item', '')},{kp.get('details', '')}\n"
+            
+            # 构建解题提示词
+            solving_prompt = f"""请根据以下知识点解答题目。
+            
+            题目：
+            {question}
+            
+            可能相关的知识点：
+            {knowledge_text_csv}
+            
+            {'这是第 ' + str(attempts) + ' 次尝试解答。请特别注意审查意见并改进：' + state.get('review_reason', '') if attempts > 1 else ''}
+            
+            请提供详细的解题过程，并明确指出使用了哪些知识点。
+            """
+            
+            # 创建消息
+            messages = [
+                SystemMessage(content=LLM_SOLVING_PROMPT),
+                HumanMessage(content=solving_prompt)
+            ]
+            
+            # 调用LLM解题
+            response = self.solving_llm.invoke(messages)
+            
+            # 更新状态
+            state["solution"] = response.content
+            state["attempts"] = attempts + 1
+            
+            return state
+        except Exception as e:
+            # 记录错误信息
+            logger.error(f"解题过程出错: {str(e)}")
+            state["error"] = f"解题失败: {str(e)}"
+            return state
+    
+    def _review_node(self, state: SolveState) -> SolveState:
+        """
+        审查节点，检查解题过程是否正确
+        
+        Args:
+            state: 当前工作流状态
+            
+        Returns:
+            更新后的工作流状态
+        """
+        try:
+            # 提取当前状态信息
+            question = state["question"]
+            solution = state["solution"]
+            correct_answer = state.get("correct_answer", "")
+            
+            # 构建审查提示词
+            review_prompt = f"""请审查以下解题过程，判断是否正确。
+            
+            题目：
+            {question}
+            
+            解题过程：
+            {solution}
+            
+            {'正确答案：\n' + correct_answer if correct_answer else ''}
+            
+            请判断解题过程是否正确，并给出具体的审查意见。如果解题过程中有错误，请明确指出错误之处和改进建议。
+            
+            请以JSON格式输出结果：
+            {{
+                "passed": true/false,  // 解题过程是否正确
+                "reason": "审查意见和建议"  // 详细的审查意见
+            }}
+            """
+            
+            # 创建消息
+            messages = [
+                SystemMessage(content=LLM_REVIEW_PROMPT),
+                HumanMessage(content=review_prompt)
+            ]
+            
+            # 调用LLM审查
+            response = self.review_llm.invoke(messages)
+            
+            # 解析JSON响应
+            try:
+                result_text = response.content
+                # 清理可能的非JSON内容
+                result_text = result_text.strip()
+                if result_text.startswith("```json"):
+                    result_text = result_text[7:]
+                if result_text.startswith("```"):
+                    result_text = result_text[3:]
+                if result_text.endswith("```"):
+                    result_text = result_text[:-3]
+                result_text = result_text.strip()
+                
+                result = json.loads(result_text)
+                
+                # 更新状态
+                state["review_passed"] = result.get("passed", False)
+                state["review_reason"] = result.get("reason", "未提供审查意见")
+                
+                return state
+            except json.JSONDecodeError:
+                # JSON解析失败，设置为审查不通过
+                state["review_passed"] = False
+                state["review_reason"] = "审查结果格式错误，无法解析"
+                return state
+        except Exception as e:
+            # 记录错误信息
+            logger.error(f"审查过程出错: {str(e)}")
+            state["error"] = f"审查失败: {str(e)}"
+            state["review_passed"] = False
+            state["review_reason"] = f"审查过程出错: {str(e)}"
+            return state
+    
+    def _should_retry(self, state: SolveState) -> Literal["retry", "end"]:
+        """
+        条件路由函数，决定是重试解题还是结束工作流
+        
+        Args:
+            state: 当前工作流状态
+            
+        Returns:
+            下一步操作："retry" 或 "end"
+        """
+        # 如果出现错误，直接结束
+        if state.get("error"):
             return "end"
-        else:
-            return "retry"
-
-    def _build_workflow(self) -> StateGraph:
-        """构建工作流图"""
+        
+        # 如果审查通过或已达到最大尝试次数，结束工作流
+        if state.get("review_passed", False) or state.get("attempts", 0) >= 3:
+            return "end"
+        
+        # 否则重试解题
+        return "retry"
+    
+    def _build_graph(self) -> StateGraph:
+        """
+        构建工作流图
+        
+        Returns:
+            StateGraph: 编译后的工作流图
+        """
         # 创建工作流图
         workflow = StateGraph(SolveState)
         
         # 添加节点
-        workflow.add_node("solve", self._solve_question)
-        workflow.add_node("review", self._review_solution)
-        workflow.add_node("mark", self._mark_knowledge_points)
+        workflow.add_node("solve", self._solve_node)
+        workflow.add_node("review", self._review_node)
         
         # 添加边
         workflow.add_edge("solve", "review")
-        workflow.add_conditional_edges("review", self._should_retry, {
-            "end": "mark",  # 解题通过或达到最大尝试次数后进入标记阶段
-            "retry": "solve"  # 解题未通过则重试
-        })
-        workflow.add_edge("mark", END)
+        workflow.add_conditional_edges(
+            "review",
+            self._should_retry,
+            {
+                "end": END,
+                "retry": "solve"
+            }
+        )
         
         # 设置入口节点
         workflow.set_entry_point("solve")
         
-        # 编译工作流
+        # 编译工作流图
         return workflow.compile()
     
-    def solve(self, question: str, knowledge_points: List[Document], is_complete: bool) -> Dict:
+    def invoke(self, initial_state: Dict[str, Any]) -> SolveState:
         """
-        执行解题工作流
+        运行解题工作流
         
         Args:
-            question: 问题文本
-            knowledge_points: 相关知识点列表
-            is_complete: 知识点是否完备
+            initial_state: 初始状态，必须包含题目内容和知识点列表
             
         Returns:
-            解题结果
+            SolveState: 最终工作流状态
         """
-        initial_state = {
-            "question": question,
-            "knowledge_points": knowledge_points,
-            "is_complete": is_complete,
-            "solution": None,
-            "review_passed": None,
-            "review_reason": None,
-            "attempts": 0,
-            "existing_knowledge_points": None,
-            "new_knowledge_points": None,
-            "knowledge_complete_after_extraction": None
-        }
+        # 检查必要的初始状态字段
+        if "question" not in initial_state:
+            raise ValueError("初始状态必须包含'question'字段")
+        if "knowledge_points" not in initial_state:
+            raise ValueError("初始状态必须包含'knowledge_points'字段")
         
-        result = self.workflow.invoke(initial_state)
-        return result 
+        # 确保状态包含尝试次数字段
+        if "attempts" not in initial_state:
+            initial_state["attempts"] = 1
+        
+        try:
+            # 创建Langfuse回调处理器
+            langfuse_handler = CallbackHandler(
+                session_id=str(initial_state.get("trace_id", "")),
+                user_id=str(initial_state.get("user_id", ""))
+            )
+            
+            # 运行工作流，使用langfuse回调
+            result = self.graph.invoke(
+                initial_state,
+                config={"callbacks": [langfuse_handler]}
+            )
+            
+            return result
+        except Exception as e:
+            # 记录错误信息
+            logger.error(f"解题工作流执行出错: {str(e)}")
+            return {
+                "error": f"解题工作流执行失败: {str(e)}",
+                **initial_state
+            } 

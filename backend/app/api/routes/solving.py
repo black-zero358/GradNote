@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_active_user
 from app.models.user import User
-from app.api.schemas.solving import SolveResponse, ExtractResult
+from app.api.schemas.solving import SolveResponse, SolveRequest
 from app.services import solving as solving_service
 
 router = APIRouter()
@@ -10,6 +10,7 @@ router = APIRouter()
 @router.post("/{question_id}", response_model=SolveResponse)
 async def solve_question(
     question_id: int,
+    request_data: SolveRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -18,12 +19,22 @@ async def solve_question(
     
     参数:
     - question_id: 错题ID
+    - request_data: 包含知识点列表的请求体
     
     返回:
     - 解题结果，包括解题步骤和相关知识点
     """
+    # 将 Pydantic 模型转换为字典列表
+    knowledge_points_data = [kp.model_dump() for kp in request_data.knowledge_points]
+    
     # 这里应该添加检查，确保用户只能解答自己的错题
-    result = solving_service.solve_question(db, question_id)
+    # (如果需要，可以在这里根据 current_user.id 检查 question_id 的所有权)
+    
+    result = solving_service.solve_question(
+        db=db, 
+        question_id=question_id, 
+        knowledge_points_data=knowledge_points_data
+    )
     
     if result["status"] == "error":
         raise HTTPException(
@@ -33,34 +44,3 @@ async def solve_question(
     
     return result
 
-@router.post("/extract/{question_id}", response_model=ExtractResult)
-async def extract_knowledge(
-    question_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """
-    从错题中提取知识点
-    
-    参数:
-    - question_id: 错题ID
-    
-    返回:
-    - 提取的知识点信息
-    """
-    # 获取错题
-    from app.models.question import WrongQuestion
-    question = db.query(WrongQuestion).filter(
-        WrongQuestion.id == question_id,
-        WrongQuestion.user_id == current_user.id
-    ).first()
-    
-    if not question:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="找不到该错题"
-        )
-    
-    # 调用知识点提取服务
-    result = solving_service.extract_knowledge_from_question(db, question.content)
-    return result 

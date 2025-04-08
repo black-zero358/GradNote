@@ -281,4 +281,20 @@ def create_knowledge_point(
     db.add(knowledge_point)
     db.commit()
     db.refresh(knowledge_point)
-    return knowledge_point 
+    return knowledge_point
+
+def get_knowledge_points_by_ids(db: Session, knowledge_point_ids: List[int]) -> List[KnowledgePoint]:
+    """
+    根据ID列表批量获取知识点
+
+    Parameters:
+    - db: 数据库会话
+    - knowledge_point_ids: 知识点ID列表
+
+    Returns:
+    - 知识点对象列表
+    """
+    if not knowledge_point_ids:
+        return []
+    
+    return db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(knowledge_point_ids)).all() 
