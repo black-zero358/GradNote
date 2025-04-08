@@ -218,6 +218,7 @@ class LLMKnowledgeRetriever:
 ```
 
 #### 解题工作流示例
+**注意：解题工作流需要重构，目前只是参考示例**
 ```python
 # app/llm_services/solving/workflow.py
 from typing import Dict, List, Optional, Literal, TypedDict
