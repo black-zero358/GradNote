@@ -5,7 +5,7 @@
 - ✅ 阶段1: Langfuse集成与基础设施 - 已完成
 - ✅ 阶段2: 知识点检索模块 - 已完成
 - ⏳ 阶段3: 解题模块 - 待实施
-- ⏳ 阶段4: 知识点标记模块 - 待实施
+- ✅ 阶段4: 知识点标记模块 - 已完成
 - ⏳ 阶段5: API版本化与测试 - 待实施
 
 ## 重构计划 (Version 2.0)
@@ -72,16 +72,16 @@ flowchart TD
   - Schema: `KnowledgeAnalyzeRequest`, `KnowledgeAnalyzeResponse`
 
 
-- **优化 `GET /search`**
+- **优化 `GET /search`** ✅
   - 基于现有知识点检索功能优化查询性能
   - 支持按科目、章节、小节多维度检索
 
-- **新增 `POST /extract-from-solution`**
+- **新增 `POST /extract-from-solution`** ✅
   - 实现从解题过程中提取使用的知识点
   - 区分"已有知识点"和"新知识点"
   - Schema: `KnowledgeExtractRequest`, `KnowledgeExtractResponse`
 
-- **新增 `POST /mark-confirmed`**
+- **新增 `POST /mark-confirmed`** ✅
   - 实现用户确认知识点标记的功能
   - 处理已有知识点标记和新知识点创建
   - Schema: `KnowledgeMarkRequest`, `KnowledgeMarkResponse`
@@ -104,11 +104,6 @@ flowchart TD
 
 ### 3. LLM服务层 (`/backend/app/llm_services/`)
 
-#### 3.1 基础服务 ✅
-- **创建 `base.py`** ✅
-  - 实现LLM工厂方法
-  - 集成Langfuse回调
-  - 配置管理
 
 #### 3.2 知识点检索服务 ✅
 - **创建 `knowledge_retriever/`** ✅
@@ -123,10 +118,10 @@ flowchart TD
   - 包含解题、审查和重试节点
 
 #### 3.4 知识点提取
-- **增强 `knowledge_mark/extractor.py`**
-  - 增强 `KnowledgeExtractor` 类
-  - 实现解题过程知识点提取
-  - 区分已有知识点和新知识点
+- **增强 `knowledge_mark/extractor.py`** ✅
+  - 增强 `KnowledgeExtractor` 类 ✅
+  - 实现解题过程知识点提取 ✅
+  - 区分已有知识点和新知识点 ✅
 
 ### 4. 服务层 (`/backend/app/services/`)
 
@@ -136,9 +131,9 @@ flowchart TD
   - 优化 `search_knowledge_points()`: 多条件查询 ✅
 
 #### 4.2 知识点标记服务
-- **创建 `knowledge_marking.py`**
-  - 实现 `apply_confirmed_markings()`: 处理用户确认的知识点标记
-  - 处理新知识点创建和关联
+- **创建 `knowledge_marking.py`** ✅
+  - 实现 `apply_confirmed_markings()`: 处理用户确认的知识点标记 ✅
+  - 处理新知识点创建和关联 ✅
 
 #### 4.3 解题服务
 - **重构 `solving.py`**
@@ -148,12 +143,6 @@ flowchart TD
 ### 5. 实施计划
 
 分阶段实施重构，确保系统稳定性：
-
-#### 阶段1: Langfuse集成与基础设施 ✅ 
-- 添加LLM基础服务和Langfuse集成
-  - ✅ 创建base.py提供工厂方法
-  - ✅ 集成Langfuse监控
-  - ✅ 提供跟踪ID管理
 
 
 #### 阶段2: 知识点检索模块 ✅ 
@@ -171,9 +160,17 @@ flowchart TD
 - 添加审查和重试机制
 
 
-#### 阶段4: 知识点标记模块
+#### 阶段4: 知识点标记模块 ✅
 - 实现知识点提取增强
+  - ✅ 增强KnowledgeExtractor类
+  - ✅ 添加extract_knowledge_points_from_solution方法
+  - ✅ 区分已有知识点和新知识点
 - 开发人工确认流程
+  - ✅ 创建knowledge_marking服务
+  - ✅ 实现apply_confirmed_markings函数
+  - ✅ 添加/extract-from-solution API端点
+  - ✅ 添加/mark-confirmed API端点
+  - ✅ 创建相关Schema
 
 
 #### 阶段5: API版本化与测试
@@ -293,4 +290,35 @@ class LLMSolvingWorkflow:
 - 降低系统耦合性: 更模块化的设计
 - 提高可维护性: 更清晰的职责分离
 - 监控能力: 通过Langfuse实现LLM调用的完整可观测性
+
+### 9. 最近更新 (2023-04-06)
+
+#### 知识点标记模块完成
+
+完成了知识点标记模块的开发工作，包括以下功能：
+
+1. **新增Schema类**:
+   - `KnowledgePointInfo`: 知识点信息模型
+   - `KnowledgeExtractRequest`/`KnowledgeExtractResponse`: 知识点提取请求和响应模型
+   - `KnowledgeMarkRequest`/`KnowledgeMarkResponse`: 知识点标记确认请求和响应模型
+
+2. **增强KnowledgeExtractor类**:
+   - 新增`extract_knowledge_points_from_solution`方法，从解题过程中提取知识点
+   - 区分已有知识点和新发现的知识点
+
+3. **新增知识点标记服务**:
+   - 创建`knowledge_marking.py`服务模块
+   - 实现`apply_confirmed_markings`函数，处理用户确认的知识点标记
+   - 实现`get_related_knowledge_points`函数，获取与问题关联的知识点
+
+4. **新增API端点**:
+   - `POST /knowledge/extract-from-solution`: 从解题过程中提取使用的知识点
+   - `POST /knowledge/mark-confirmed`: 处理用户确认的知识点标记
+
+#### 下一步开发计划
+
+- 实施解题模块重构，使用LangGraph优化解题流程
+- 添加解题审查和重试机制
+- 创建v1版本API
+- 进行全面功能测试
 
