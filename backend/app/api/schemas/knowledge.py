@@ -67,3 +67,34 @@ class KnowledgeCategory(BaseModel):
 
 class KnowledgeAnalyzeResponse(BaseModel):
     categories: List[KnowledgeCategory]
+
+# 用于从解题过程中提取知识点的Schema
+class KnowledgePointInfo(BaseModel):
+    subject: str
+    chapter: str
+    section: str
+    item: str
+    details: Optional[str] = None
+    is_existing: bool = False  # 标记是否为已存在的知识点
+
+class KnowledgeExtractRequest(BaseModel):
+    question_text: str
+    solution_text: str
+    # 可选参数，如果提供，表示已知的知识点ID列表
+    existing_knowledge_point_ids: Optional[List[int]] = None
+
+class KnowledgeExtractResponse(BaseModel):
+    existing_knowledge_points: List[KnowledgePoint] = []  # 已存在的知识点
+    new_knowledge_points: List[KnowledgePointInfo] = []   # 新识别的知识点
+
+# 用于确认知识点标记的Schema
+class KnowledgeMarkRequest(BaseModel):
+    question_id: int
+    # 确认标记的已存在知识点ID列表
+    existing_knowledge_point_ids: List[int] = []
+    # 确认创建的新知识点列表
+    new_knowledge_points: List[KnowledgePointInfo] = []
+
+class KnowledgeMarkResponse(BaseModel):
+    question_id: int
+    marked_knowledge_points: List[KnowledgePoint]  # 已标记的所有知识点（包括新创建的）

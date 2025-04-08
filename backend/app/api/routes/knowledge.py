@@ -13,11 +13,19 @@ from app.api.schemas.knowledge import (
     Mark,
     KnowledgeAnalyzeRequest,
     KnowledgeAnalyzeResponse,
-    KnowledgeCategory
+    KnowledgeCategory,
+    KnowledgeExtractRequest,
+    KnowledgeExtractResponse,
+    KnowledgeMarkRequest,
+    KnowledgeMarkResponse,
+    KnowledgePointInfo
 )
 from app.models.user import User
 from app.models.knowledge import KnowledgePoint as KnowledgePointModel
 from app.llm_services import LLMKnowledgeRetriever
+from app.llm_services.knowledge_mark import KnowledgeExtractor
+from app import services
+from app.services import knowledge_marking
 
 router = APIRouter()
 
@@ -230,4 +238,107 @@ async def analyze_knowledge_from_question(
     return KnowledgeAnalyzeResponse(
         categories=categories,
 
+    ) 
+
+@router.post("/extract-from-solution", response_model=KnowledgeExtractResponse)
+async def extract_knowledge_from_solution(
+    request: KnowledgeExtractRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    从解题过程中提取使用的知识点，区分"已有知识点"和"新知识点"
+    参数：
+        question_text: 题目文本
+        solution_text: 解题过程文本
+        existing_knowledge_point_ids: 可选参数，如果提供，表示已知的知识点ID列表
+
+    返回：
+        existing_knowledge_points: 已存在的知识点列表
+        new_knowledge_points: 新识别的知识点列表
+    """
+    # 初始化知识点提取器
+    extractor = KnowledgeExtractor()
+    
+    # 获取可能用到的知识点
+    existing_knowledge_points = []
+    if request.existing_knowledge_point_ids:
+        # 获取已有知识点详情
+        for kp_id in request.existing_knowledge_point_ids:
+            kp = knowledge_service.get_knowledge_point_by_id(db, kp_id)
+            if kp:
+                existing_knowledge_points.append({
+                    "id": kp.id,
+                    "subject": kp.subject,
+                    "chapter": kp.chapter,
+                    "section": kp.section,
+                    "item": kp.item,
+                    "details": kp.details
+                })
+    
+    # 从解题过程提取知识点，等待异步方法完成
+    used_existing_points, new_points = await extractor.extract_knowledge_points_from_solution(
+        question_text=request.question_text,
+        solution_text=request.solution_text,
+        existing_knowledge_points=existing_knowledge_points
+    )
+    
+
+    # 获取已使用的知识点完整信息
+    used_existing_knowledge_points = []
+    for point in used_existing_points:
+        kp_id = point.get("id")
+        if kp_id:
+            kp = knowledge_service.get_knowledge_point_by_id(db, kp_id)
+            if kp:
+                used_existing_knowledge_points.append(kp)
+    
+    # 准备新识别的知识点
+    new_knowledge_points = [
+        KnowledgePointInfo(
+            subject=point.get("subject", ""),
+            chapter=point.get("chapter", ""),
+            section=point.get("section", ""),
+            item=point.get("item", ""),
+            details=point.get("details", ""),
+            is_existing=False
+        )
+        for point in new_points
+    ]
+    
+    return KnowledgeExtractResponse(
+        existing_knowledge_points=used_existing_knowledge_points,
+        new_knowledge_points=new_knowledge_points
+    )
+
+@router.post("/mark-confirmed", response_model=KnowledgeMarkResponse)
+async def mark_confirmed_knowledge_points(
+    request: KnowledgeMarkRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    处理用户确认的知识点标记，包括已有知识点和新知识点
+    参数：
+        question_id: 题目ID
+        existing_knowledge_point_ids: 确认标记的已存在知识点ID列表
+        new_knowledge_points: 确认创建的新知识点列表
+
+    返回：
+        question_id: 题目ID
+        marked_knowledge_points: 已标记的所有知识点（包括新创建的）
+    """
+    # 处理确认的知识点标记
+    new_knowledge_points_data = [kp.model_dump() for kp in request.new_knowledge_points]
+    
+    marked_points = knowledge_marking.apply_confirmed_markings(
+        db=db,
+        user_id=current_user.id,
+        question_id=request.question_id,
+        existing_knowledge_point_ids=request.existing_knowledge_point_ids,
+        new_knowledge_points=new_knowledge_points_data
+    )
+    
+    return KnowledgeMarkResponse(
+        question_id=request.question_id,
+        marked_knowledge_points=marked_points
     ) 

@@ -1,10 +1,14 @@
 import json
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
 from langfuse.callback import CallbackHandler
+import logging
 
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 # 从环境变量获取配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
@@ -215,4 +219,93 @@ class KnowledgeExtractor:
             extracted_points = json.loads(response.content)
             return extracted_points if isinstance(extracted_points, list) else []
         except json.JSONDecodeError:
-            return [] 
+            return []
+
+    async def extract_knowledge_points_from_solution(
+        self,
+        question_text: str,
+        solution_text: str,
+        existing_knowledge_points: Optional[List[Dict]] = None
+    ) -> Tuple[List[Dict], List[Dict]]:
+        """
+        从解题过程中提取使用的知识点，并区分已有知识点和新知识点
+        
+        Args:
+            question_text: 题目文本
+            solution_text: 解题过程文本
+            existing_knowledge_points: 可能用到的已有知识点列表，每个元素包含id, subject, chapter, section, item, details
+            
+        Returns:
+            已使用的已有知识点列表和新识别的知识点列表的元组
+        """
+        # 构建已有知识点的文本
+        existing_points_text = ""
+        if existing_knowledge_points and len(existing_knowledge_points) > 0:
+            existing_points_text = "已有知识点列表：\n" + "\n".join([
+                f"{i+1}. [{point['id']}] {point['subject']}/{point['chapter']}/{point['section']}: {point['item']}" +
+                (f"/{point['details']}" if point.get('details') else "")
+                for i, point in enumerate(existing_knowledge_points)
+            ])
+        
+        prompt = f"""分析以下题目的解题过程，识别其中用到的知识点，并区分已有知识点和新知识点。
+
+题目：
+{question_text}
+
+解题过程：
+{solution_text}
+
+{existing_points_text}
+
+请完成两项任务：
+1. 从已有知识点列表中，识别出解题过程中实际使用到的知识点ID列表
+2. 识别解题过程中用到但不在已有列表中的新知识点
+
+请以JSON格式返回：
+{{
+    "used_existing_knowledge_points": [已使用的已有知识点ID列表],
+    "new_knowledge_points": [
+        {{
+            "subject": "科目",
+            "chapter": "章节",
+            "section": "小节",
+            "item": "知识点名称",
+            "details": "知识点详细说明"
+        }}
+    ]
+}}
+
+如果没有已有知识点被使用，"used_existing_knowledge_points"应为空数组。
+如果没有新知识点被识别，"new_knowledge_points"应为空数组。
+"""
+        
+        # 确保等待LLM响应完成
+        response = await self.llm.ainvoke(prompt)
+
+        #处理llm响应，使其符合json格式
+        response.content = response.content.replace("```json", "").replace("```", "")
+        
+        # 解析JSON响应
+        try:
+            result = json.loads(response.content)
+            
+            # 查找并返回已使用的已有知识点
+            used_existing_points = []
+            if existing_knowledge_points:
+                # 创建ID到知识点的映射
+                id_to_point = {point['id']: point for point in existing_knowledge_points}
+                # 获取使用的知识点ID
+                used_ids = result.get('used_existing_knowledge_points', [])
+                # 收集已使用的知识点详情
+                used_existing_points = [id_to_point[point_id] for point_id in used_ids if point_id in id_to_point]
+            
+            # 获取新识别的知识点
+            new_points = result.get('new_knowledge_points', [])
+            
+            return used_existing_points, new_points
+            
+        except json.JSONDecodeError:
+            # log
+            logger.error(f"解析失败:result {result}, content {response.content}")
+            # 如果解析失败，返回空结果
+            return [], []
