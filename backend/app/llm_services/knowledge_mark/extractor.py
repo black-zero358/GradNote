@@ -242,7 +242,7 @@ class KnowledgeExtractor:
         existing_points_text = ""
         if existing_knowledge_points and len(existing_knowledge_points) > 0:
             existing_points_text = "已有知识点列表：\n" + "\n".join([
-                f"{i+1}. [{point['id']}] {point['subject']}/{point['chapter']}/{point['section']}: {point['item']}" +
+                f"[{point['id']}] {point['subject']}/{point['chapter']}/{point['section']}: {point['item']}" +
                 (f"/{point['details']}" if point.get('details') else "")
                 for i, point in enumerate(existing_knowledge_points)
             ])
