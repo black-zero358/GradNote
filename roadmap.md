@@ -4,9 +4,9 @@
 
 - ✅ 阶段1: Langfuse集成与基础设施 - 已完成
 - ✅ 阶段2: 知识点检索模块 - 已完成
-- ⏳ 阶段3: 解题模块 - 待实施
+- ✅ 阶段3: 解题模块 - 已完成
 - ✅ 阶段4: 知识点标记模块 - 已完成
-- ⏳ 阶段5: API版本化与测试 - 待实施
+- ⏳ 阶段5: API版本化与测试 - 部分完成
 
 ## 重构计划 (Version 2.0)
 
@@ -87,7 +87,7 @@ flowchart TD
   - Schema: `KnowledgeMarkRequest`, `KnowledgeMarkResponse`
 
 #### 1.3 解题模块 (`/api/v1/solving`)
-- **重构 `POST /solve`**
+- **实现 `POST /solve`** ✅
   - 使用LangGraph优化解题流程
   - 添加审查和重试机制
   - Schema: `SolveRequest`, `SolveResponse`
@@ -111,10 +111,10 @@ flowchart TD
   - `retriever.py`: 实现 `LLMKnowledgeRetriever` 类
     - `analyze_knowledge_category()`: 分析题目所属知识点类别
 
-#### 3.3 解题工作流
-- **重构 `solving/workflow.py`**
+#### 3.3 解题工作流 ✅
+- **创建 `solving/workflow.py`** ✅
   - 使用LangGraph实现完整解题流程
-  - 实现 `LLMSolvingWorkflow` 类替代现有 `SolveWorkflow`
+  - 实现 `LLMSolvingWorkflow` 类
   - 包含解题、审查和重试节点
 
 #### 3.4 知识点提取
@@ -130,15 +130,15 @@ flowchart TD
   - 添加 `get_all_categories_csv()`: 获取知识点类别CSV ✅
   - 优化 `search_knowledge_points()`: 多条件查询 ✅
 
-#### 4.2 知识点标记服务
+#### 4.2 知识点标记服务 ✅
 - **创建 `knowledge_marking.py`** ✅
   - 实现 `apply_confirmed_markings()`: 处理用户确认的知识点标记 ✅
   - 处理新知识点创建和关联 ✅
 
-#### 4.3 解题服务
-- **重构 `solving.py`**
-  - 简化现有方法
-  - 添加与LLM工作流的协调逻辑
+#### 4.3 解题服务 ✅
+- **实现 `solving.py`** ✅
+  - 集成与LLM工作流的协调逻辑
+  - 错题ID校验和错误处理
 
 ### 5. 实施计划
 
@@ -155,9 +155,15 @@ flowchart TD
   - ✅ 创建相关Schema
 
 
-#### 阶段3: 解题模块
+#### 阶段3: 解题模块 ✅
 - 重构解题工作流
+  - ✅ 创建LLMSolvingWorkflow类
+  - ✅ 实现解题节点(_solve_node)
+  - ✅ 实现审查节点(_review_node)
+  - ✅ 实现条件路由(_should_retry)
 - 添加审查和重试机制
+  - ✅ 实现多次尝试解题逻辑
+  - ✅ 错误处理和恢复机制
 
 
 #### 阶段4: 知识点标记模块 ✅
@@ -173,109 +179,78 @@ flowchart TD
   - ✅ 创建相关Schema
 
 
-#### 阶段5: API版本化与测试
-- 创建v1版本API
+#### 阶段5: API版本化与测试 ⏳
+- 创建v1版本API ⏳
+  - ✅ API_V1_STR配置 
+  - ⏳ 路由v1前缀化
+  - ⏳ 完整版本兼容测试
 - 全面测试所有功能
+  - ⏳ 端到端测试
+  - ⏳ 单元测试
 
 
-### 6. 代码示例
+### 6. 示例代码
 
-#### 知识点检索示例 ✅
+#### 解题工作流实现
 ```python
-# app/llm_services/knowledge_retriever/retriever.py
-import json
-from typing import List, Dict
-from app.llm_services.base import get_llm
-
-class LLMKnowledgeRetriever:
-    def __init__(self, llm=None):
-        self.llm = llm or get_llm()
-        
-    
-    def analyze_knowledge_category(self, question_text: str, categories_csv: str) -> List[Dict[str, str]]:
-        """分析题目所属的知识点类别"""
-        
-        prompt = f"""分析以下题目，确定其所属的科目、章节和小节。
-        题目：{question_text}
-        
-        参考以下知识点类别 (CSV格式):
-        {categories_csv}
-        
-        请以JSON格式返回可能相关的知识点类别列表：
-        [
-            {{"subject": "科目名称", "chapter": "章节名称", "section": "小节名称"}}
-        ]
-        """
-        
-        response = self.llm.invoke(prompt)
-        
-        # 解析JSON响应
-        try:
-            result = json.loads(response.content)
-            return result if isinstance(result, list) else []
-        except json.JSONDecodeError:
-            return []
-```
-
-#### 解题工作流示例
-**注意：解题工作流需要重构，目前只是参考示例**
-```python
-# app/llm_services/solving/workflow.py
-from typing import Dict, List, Optional, Literal, TypedDict
-from langgraph.graph import StateGraph, END
-from app.llm_services.base import get_llm
-from langfuse.callback import CallbackHandler
-
-class SolveState(TypedDict):
-    """解题工作流状态类型"""
-    question: str
-    knowledge_points: List[str]
-    correct_answer: Optional[str]
-    solution: Optional[str]
-    review_passed: Optional[bool]
-    review_reason: Optional[str] 
-    attempts: int
-
 class LLMSolvingWorkflow:
-    def __init__(self, llm=None):
-        self.llm = llm or get_llm()
-        
-        self.graph = self._build_graph()
+    """
+    基于LangGraph的解题工作流
     
-    # 解题节点实现...
+    实现完整的解题流程，包括：
+    1. 使用LLM解题
+    2. 审查解题过程与结果
+    3. 如果审查不通过，重试解题
+    """
     
-    # 审查节点实现...
-    
-    # 条件路由实现...
-    
-    def _build_graph(self) -> StateGraph:
-        workflow = StateGraph(SolveState)
-        
-        # 添加节点
-        workflow.add_node("solve", self._solve_node)
-        workflow.add_node("review", self._review_node)
-        
-        # 添加边
-        workflow.add_edge("solve", "review")
-        workflow.add_conditional_edges(
-            "review",
-            self._should_retry,
-            {
-                "end": END,
-                "retry": "solve"
-            }
+    def __init__(self, 
+                 api_key: Optional[str] = None, 
+                 api_base: Optional[str] = None, 
+                 solving_model: Optional[str] = None,
+                 review_model: Optional[str] = None):
+        """
+        初始化解题工作流
+        """
+        # 初始化解题LLM
+        self.solving_llm = ChatOpenAI(
+            api_key=api_key or OPENAI_API_KEY,
+            base_url=api_base or OPENAI_API_BASE,
+            model_name=solving_model or LLM_SOLVING_MODEL
         )
         
-        # 设置入口节点
-        workflow.set_entry_point("solve")
+        # 初始化审查LLM
+        self.review_llm = ChatOpenAI(
+            api_key=api_key or OPENAI_API_KEY,
+            base_url=api_base or OPENAI_API_BASE,
+            model_name=review_model or LLM_REVIEW_MODEL
+        )
         
-        return workflow.compile()
+        # 构建工作流图
+        self.graph = self._build_graph()
+        
+    # 解题节点实现
+    def _solve_node(self, state: SolveState) -> SolveState:
+        """解题节点，使用LLM和知识点解答题目"""
+        # 实现逻辑...
     
-    def invoke(self, initial_state: Dict) -> SolveState:
+    # 审查节点实现
+    def _review_node(self, state: SolveState) -> SolveState:
+        """审查节点，检查解题过程是否正确"""
+        # 实现逻辑...
+    
+    # 条件路由实现
+    def _should_retry(self, state: SolveState) -> Literal["retry", "end"]:
+        """决定是重试解题还是结束工作流"""
+        # 实现逻辑...
+    
+    def _build_graph(self) -> StateGraph:
+        """构建工作流图"""
+        # 实现逻辑...
+    
+    def invoke(self, initial_state: Dict[str, Any]) -> SolveState:
         """运行解题工作流"""
-        return self.graph.invoke(initial_state)
+        # 实现逻辑...
 ```
-
 
 ### 7. 技术栈 
 
@@ -292,34 +267,33 @@ class LLMSolvingWorkflow:
 - 提高可维护性: 更清晰的职责分离
 - 监控能力: 通过Langfuse实现LLM调用的完整可观测性
 
-### 9. 最近更新 (2023-04-06)
+### 9. 最近更新
 
-#### 知识点标记模块完成
+#### 解题模块完成
 
-完成了知识点标记模块的开发工作，包括以下功能：
+解题模块已完成开发工作，主要包括以下功能：
 
-1. **新增Schema类**:
-   - `KnowledgePointInfo`: 知识点信息模型
-   - `KnowledgeExtractRequest`/`KnowledgeExtractResponse`: 知识点提取请求和响应模型
-   - `KnowledgeMarkRequest`/`KnowledgeMarkResponse`: 知识点标记确认请求和响应模型
+1. **基于LangGraph的解题工作流**:
+   - 完整实现`LLMSolvingWorkflow`类，支持解题、审查和重试流程
+   - 实现解题节点`_solve_node`，使用LLM和知识点解答题目
+   - 实现审查节点`_review_node`，检查解题结果并提供改进建议
+   - 实现条件路由`_should_retry`，支持最多3次解题尝试
 
-2. **增强KnowledgeExtractor类**:
-   - 新增`extract_knowledge_points_from_solution`方法，从解题过程中提取知识点
-   - 区分已有知识点和新发现的知识点
+2. **解题服务增强**:
+   - 重构`solve_question`方法，支持解题工作流完整集成
+   - 优化知识点处理和错误处理
 
-3. **新增知识点标记服务**:
-   - 创建`knowledge_marking.py`服务模块
-   - 实现`apply_confirmed_markings`函数，处理用户确认的知识点标记
-   - 实现`get_related_knowledge_points`函数，获取与问题关联的知识点
+3. **API端点完善**:
+   - 完善了`POST /solving/{question_id}`接口实现
+   - 支持错误处理和状态码映射
 
-4. **新增API端点**:
-   - `POST /knowledge/extract-from-solution`: 从解题过程中提取使用的知识点
-   - `POST /knowledge/mark-confirmed`: 处理用户确认的知识点标记
+4. **模型支持**:
+   - 添加了配置化的模型选择机制，支持DeepSeek系列模型
+   - 通过环境变量配置解题模型和审查模型
 
 #### 下一步开发计划
 
-- 实施解题模块重构，使用LangGraph优化解题流程
-- 添加解题审查和重试机制
-- 创建v1版本API
+- 完成API版本化实现，确保向后兼容性
 - 进行全面功能测试
+- 开发更完善的错误处理和监控机制
 
