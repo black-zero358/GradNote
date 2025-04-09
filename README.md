@@ -1,7 +1,7 @@
 # GradNote - 错题知识点管理系统
 
 <div align="center">
-  <img src="docs/assets/logo.png" alt="GradNote Logo" width="200" height="200" style="display:none;">
+  <img src="https://sm.ms/image/ETjvxPNdeqMQLgZ" alt="GradNote Logo" width="200" height="200" style="display:none;">
 
   ![GitHub](https://img.shields.io/github/license/black-zero358/GradNote)
   ![Python](https://img.shields.io/badge/python-3.13-blue.svg)
