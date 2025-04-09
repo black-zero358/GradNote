@@ -41,7 +41,7 @@ def create_indexes():
         # 错题备注索引 - 提高备注内容搜索性能
         """
         CREATE INDEX IF NOT EXISTS idx_wrong_questions_remark 
-        ON wrong_questions USING gin(to_tsvector('chinese', remark))
+        ON wrong_questions USING gin(to_tsvector('simple', remark))
         """
     ]
     
