@@ -9,7 +9,7 @@ class SolveResult(BaseModel):
     review_passed: Optional[bool] = None
     review_reason: Optional[str] = None
     knowledge_points: List[KnowledgePoint]
-    new_knowledge_points: List[KnowledgePoint]
+
 
 class SolveResponse(BaseModel):
     status: str
@@ -23,15 +23,5 @@ class ExtractResult(BaseModel):
     is_complete: bool
     evaluation: Dict[str, Any]
 
-class KnowledgePointInput(BaseModel):
-    id: int
-    subject: str
-    chapter: str
-    section: str
-    item: str
-    details: Optional[str] = None
-    mark_count: int = 0
-    created_at: datetime = datetime.now()
-
 class SolveRequest(BaseModel):
-    knowledge_points: List[KnowledgePointInput] 
+    knowledge_points: List[int] 

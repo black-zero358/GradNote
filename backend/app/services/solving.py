@@ -19,7 +19,7 @@ def solve_question(db: Session, question_id: int, knowledge_points_data: List[Di
     Args:
         db: 数据库会话
         question_id: 错题ID
-        knowledge_points_data: 相关知识点数据列表
+        knowledge_points_data: 相关知识点数据列表（只包含ID）
         
     Returns:
         Dict: 解题结果，包括解题步骤和相关知识点
@@ -40,53 +40,40 @@ def solve_question(db: Session, question_id: int, knowledge_points_data: List[Di
                 "message": "未提供相关知识点，无法解题"
             }
         
-        # 获取完整的知识点信息，包括 mark_count 和 created_at
-        complete_knowledge_points = []
+        # 获取知识点ID列表
         knowledge_point_ids = [kp.get("id") for kp in knowledge_points_data if kp.get("id")]
         
-        if knowledge_point_ids:
-            # 从数据库获取完整的知识点信息
-            db_knowledge_points = get_knowledge_points_by_ids(db, knowledge_point_ids)
-            
-            # 创建ID到知识点的映射
-            kp_map = {kp.id: kp for kp in db_knowledge_points}
-            
-            # 使用数据库信息补充客户端提供的知识点数据
-            for kp_data in knowledge_points_data:
-                kp_id = kp_data.get("id")
-                if kp_id and kp_id in kp_map:
-                    # 数据库中存在的知识点
-                    db_kp = kp_map[kp_id]
-                    complete_knowledge_points.append({
-                        "id": db_kp.id,
-                        "subject": db_kp.subject,
-                        "chapter": db_kp.chapter,
-                        "section": db_kp.section,
-                        "item": db_kp.item,
-                        "details": db_kp.details,
-                        "mark_count": db_kp.mark_count,
-                        "created_at": db_kp.created_at
-                    })
-                else:
-                    # 数据库中不存在的知识点，添加默认值
-                    complete_knowledge_points.append({
-                        **kp_data,
-                        "mark_count": kp_data.get("mark_count", 0),
-                        "created_at": kp_data.get("created_at", datetime.now())
-                    })
-        else:
-            # 如果没有有效的知识点ID，使用客户端提供的数据并添加默认值
-            for kp_data in knowledge_points_data:
-                complete_knowledge_points.append({
-                    **kp_data,
-                    "mark_count": kp_data.get("mark_count", 0),
-                    "created_at": kp_data.get("created_at", datetime.now())
-                })
+        if not knowledge_point_ids:
+            return {
+                "status": "error",
+                "message": "未提供有效的知识点ID，无法解题"
+            }
         
-        # 初始化工作流状态（使用原始知识点数据，因为LLM不需要mark_count和created_at字段）
+        # 从数据库获取完整的知识点信息
+        db_knowledge_points = get_knowledge_points_by_ids(db, knowledge_point_ids)
+        
+        if not db_knowledge_points:
+            return {
+                "status": "error",
+                "message": "未找到指定的知识点，无法解题"
+            }
+        
+        # 为LLM准备知识点数据
+        llm_knowledge_points = []
+        for kp in db_knowledge_points:
+            llm_knowledge_points.append({
+                "id": kp.id,
+                "subject": kp.subject,
+                "chapter": kp.chapter,
+                "section": kp.section,
+                "item": kp.item,
+                "details": kp.details
+            })
+        
+        # 初始化工作流状态
         initial_state = {
             "question": question.content,
-            "knowledge_points": knowledge_points_data,
+            "knowledge_points": llm_knowledge_points,
             "correct_answer": question.answer,
             "attempts": 1
         }
@@ -104,7 +91,21 @@ def solve_question(db: Session, question_id: int, knowledge_points_data: List[Di
                 "message": result.get("error", "解题过程出错")
             }
         
-        # 返回结果（使用完整的知识点数据，包含mark_count和created_at）
+        # 为响应准备完整的知识点数据
+        complete_knowledge_points = []
+        for kp in db_knowledge_points:
+            complete_knowledge_points.append({
+                "id": kp.id,
+                "subject": kp.subject,
+                "chapter": kp.chapter,
+                "section": kp.section,
+                "item": kp.item,
+                "details": kp.details,
+                "mark_count": kp.mark_count,
+                "created_at": kp.created_at
+            })
+        
+        # 返回结果
         return {
             "status": "success",
             "message": "解题成功",
@@ -114,7 +115,6 @@ def solve_question(db: Session, question_id: int, knowledge_points_data: List[Di
                 "review_passed": result.get("review_passed", False),
                 "review_reason": result.get("review_reason", ""),
                 "knowledge_points": complete_knowledge_points,
-                "new_knowledge_points": [] # LLM暂时无法生成新知识点，保留此项以兼容原有接口
             }
         }
     except Exception as e:

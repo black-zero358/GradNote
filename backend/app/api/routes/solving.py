@@ -19,13 +19,13 @@ async def solve_question(
     
     参数:
     - question_id: 错题ID
-    - request_data: 包含知识点列表的请求体
+    - request_data: 包含知识点ID列表的请求体
     
     返回:
     - 解题结果，包括解题步骤和相关知识点
     """
-    # 将 Pydantic 模型转换为字典列表
-    knowledge_points_data = [kp.model_dump() for kp in request_data.knowledge_points]
+    # 将知识点ID列表转换为所需格式
+    knowledge_points_data = [{"id": kp_id} for kp_id in request_data.knowledge_points]
     
     # 这里应该添加检查，确保用户只能解答自己的错题
     # (如果需要，可以在这里根据 current_user.id 检查 question_id 的所有权)
