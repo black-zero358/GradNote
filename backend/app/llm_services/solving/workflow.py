@@ -286,7 +286,8 @@ class LLMSolvingWorkflow:
             # 创建Langfuse回调处理器
             langfuse_handler = CallbackHandler(
                 session_id=str(initial_state.get("trace_id", "")),
-                user_id=str(initial_state.get("user_id", ""))
+                user_id=str(initial_state.get("user_id", "")),
+                tags=["解题工作流"]
             )
 
             # 运行工作流，使用langfuse回调

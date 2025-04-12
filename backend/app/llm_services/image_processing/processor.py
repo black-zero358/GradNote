@@ -120,7 +120,7 @@ class ImageProcessor:
             max_image_size: 最大处理图片大小（字节），默认20MB
             strict_format_check: 是否启用严格的图像格式检查，启用后对未知格式将抛出异常
         """
-        self.langfuse_handler = CallbackHandler()
+        self.langfuse_handler = CallbackHandler(tags=["VLM"])
         self.vlm = ChatOpenAI(
             api_key=api_key or OPENAI_API_KEY,
             base_url=api_base or OPENAI_API_BASE,

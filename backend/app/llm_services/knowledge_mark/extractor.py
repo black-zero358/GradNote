@@ -26,7 +26,7 @@ class KnowledgeExtractor:
             api_base: API基础URL，默认从环境变量获取
             model_name: 模型名称，默认从环境变量获取
         """
-        self.langfuse_handler = CallbackHandler()
+        self.langfuse_handler = CallbackHandler(tags=["知识点提取"])
         self.llm = ChatOpenAI(
             api_key=api_key or OPENAI_API_KEY,
             base_url=api_base or OPENAI_API_BASE,

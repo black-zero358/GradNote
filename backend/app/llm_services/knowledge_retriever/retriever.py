@@ -36,7 +36,7 @@ class LLMKnowledgeRetriever:
         """
         # 设置Langfuse回调
         callbacks = []
-        self.langfuse_handler = CallbackHandler()
+        self.langfuse_handler = CallbackHandler(tags=["知识点检索"])
         callbacks.append(self.langfuse_handler)
 
 
