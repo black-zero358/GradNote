@@ -190,6 +190,8 @@ class LLMSolvingWorkflow:
                     result_text = result_text[:-3]
                 result_text = result_text.strip()
 
+                result_text=result_text.replace("\\","\\\\")
+
                 result = json.loads(result_text)
 
                 # 更新状态
@@ -200,7 +202,7 @@ class LLMSolvingWorkflow:
             except json.JSONDecodeError:
                 # JSON解析失败，设置为审查不通过
                 state["review_passed"] = False
-                state["review_reason"] = "审查结果格式错误，无法解析"
+                state["review_reason"] = "JSON解析失败"
                 return state
         except Exception as e:
             # 记录错误信息
