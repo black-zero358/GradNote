@@ -6,8 +6,6 @@ from app.api.deps import get_db, get_current_active_user
 from app.models.user import User
 from app.models.question import WrongQuestion
 from app.api.schemas.question import Question, QuestionCreate, QuestionUpdate, QuestionResponse
-from app.services import image as image_service
-from app.api.routes.image import process_image
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -122,91 +120,91 @@ async def delete_question(
     db.commit()
     return question
 
-@router.post("/from-image", response_model=QuestionResponse)
-async def create_question_from_image(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """
-    从图片创建错题
+# @router.post("/from-image", response_model=QuestionResponse)
+# async def create_question_from_image(
+#     file: UploadFile = File(...),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_active_user)
+# ):
+#     """
+#     从图片创建错题
     
-    此API将图片处理与错题创建结合在一起，一步完成从图片提取文本并创建错题的过程。
+#     此API将图片处理与错题创建结合在一起，一步完成从图片提取文本并创建错题的过程。
     
-    处理流程:
-    1. 上传图片
-    2. 使用图像处理服务提取文本内容
-    3. 将提取的文本及图片URL保存为新的错题
+#     处理流程:
+#     1. 上传图片
+#     2. 使用图像处理服务提取文本内容
+#     3. 将提取的文本及图片URL保存为新的错题
     
-    参数:
-    - file: 错题图片文件
+#     参数:
+#     - file: 错题图片文件
     
-    返回:
-    - status: 处理状态 (success/error)
-    - data: 创建的错题信息
-    - message: 操作结果消息
-    """
-    # 检查文件类型
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="仅支持图像文件"
-        )
+#     返回:
+#     - status: 处理状态 (success/error)
+#     - data: 创建的错题信息
+#     - message: 操作结果消息
+#     """
+#     # 检查文件类型
+#     if not file.content_type.startswith('image/'):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="仅支持图像文件"
+#         )
     
-    # 读取文件内容
-    file_content = await file.read()
+#     # 读取文件内容
+#     file_content = await file.read()
     
-    # 复用图像处理API
-    # 修复 UploadFile 初始化问题
-    # 需要重新定位文件指针到开始位置
-    await file.seek(0)
-    # 直接传递已有的 file 对象而不是尝试创建新的
-    result = await process_image(file=file, db=db, current_user=current_user)
+#     # 复用图像处理API
+#     # 修复 UploadFile 初始化问题
+#     # 需要重新定位文件指针到开始位置
+#     await file.seek(0)
+#     # 直接传递已有的 file 对象而不是尝试创建新的
+#     result = await process_image(file=file, db=db, current_user=current_user)
     
-    if result["status"] == "error":
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=result["message"]
-        )
+#     if result["status"] == "error":
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=result["message"]
+#         )
     
-    # 创建错题
-    question_data = {
-        "content": result["text"],
-        "image_url": result["image_url"]
-    }
+#     # 创建错题
+#     question_data = {
+#         "content": result["text"],
+#         "image_url": result["image_url"]
+#     }
     
-    try:
+#     try:
         
-        # 保存到数据库
-        db_question = WrongQuestion(
-            user_id=current_user.id,
-            **question_data
-        )
-        db.add(db_question)
-        db.commit()
-        db.refresh(db_question)
+#         # 保存到数据库
+#         db_question = WrongQuestion(
+#             user_id=current_user.id,
+#             **question_data
+#         )
+#         db.add(db_question)
+#         db.commit()
+#         db.refresh(db_question)
         
-        # 将 SQLAlchemy 模型转换为字典，而不是直接返回模型对象
-        question_dict = {
-            "id": db_question.id,
-            "user_id": db_question.user_id,
-            "content": db_question.content,
-            "solution": db_question.solution,
-            "answer": db_question.answer,
-            "subject": db_question.subject,
-            "image_url": db_question.image_url,
-            "remark": db_question.remark,
-            "created_at": db_question.created_at
-        }
+#         # 将 SQLAlchemy 模型转换为字典，而不是直接返回模型对象
+#         question_dict = {
+#             "id": db_question.id,
+#             "user_id": db_question.user_id,
+#             "content": db_question.content,
+#             "solution": db_question.solution,
+#             "answer": db_question.answer,
+#             "subject": db_question.subject,
+#             "image_url": db_question.image_url,
+#             "remark": db_question.remark,
+#             "created_at": db_question.created_at
+#         }
         
-        return {
-            "status": "success",
-            "data": question_dict,
-            "message": "从图片创建错题成功"
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"创建错题失败: {str(e)}"
-        ) 
+#         return {
+#             "status": "success",
+#             "data": question_dict,
+#             "message": "从图片创建错题成功"
+#         }
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"创建错题失败: {str(e)}"
+#         ) 
