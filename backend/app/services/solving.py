@@ -12,7 +12,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def solve_question(db: Session, question_id: int, knowledge_points_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+async def solve_question(db: Session, question_id: int, knowledge_points_data: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     解答错题
     
@@ -78,13 +78,10 @@ def solve_question(db: Session, question_id: int, knowledge_points_data: List[Di
             "attempts": 1
         }
         
-        # 创建解题工作流
+        # 创建并异步运行工作流
         workflow = LLMSolvingWorkflow()
+        result = await workflow.invoke(initial_state)
         
-        # 运行工作流
-        result = workflow.invoke(initial_state)
-        
-        # 检查工作流是否出错
         if result.get("error"):
             return {
                 "status": "error",

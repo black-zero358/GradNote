@@ -103,16 +103,16 @@ class InvalidBase64Error(ImageProcessorError):
 
 class ImageProcessor:
     """图像处理类，用于将错题图片转换为文本"""
-    
-    def __init__(self, 
-                 api_key: Optional[str] = None, 
-                 api_base: Optional[str] = None, 
+
+    def __init__(self,
+                 api_key: Optional[str] = None,
+                 api_base: Optional[str] = None,
                  model_name: Optional[str] = None,
                  max_image_size: int = DEFAULT_MAX_IMAGE_SIZE,
                  strict_format_check: bool = False):
         """
         初始化图像处理器
-        
+
         Args:
             api_key: API密钥，默认从环境变量获取
             api_base: API基础URL，默认从环境变量获取
@@ -129,17 +129,17 @@ class ImageProcessor:
         )
         self.max_image_size = max_image_size
         self.strict_format_check = strict_format_check
-    
+
     def _validate_file_path(self, image_path: str) -> str:
         """
         验证文件路径的安全性和有效性
-        
+
         Args:
             image_path: 图像文件路径
-            
+
         Returns:
             绝对路径字符串
-            
+
         Raises:
             ImagePathError: 路径无效或不存在
             ImageSizeExceededError: 图片大小超过限制
@@ -153,7 +153,7 @@ class ImageProcessor:
         if not path.is_file():
             logger.error(f"路径不是文件: {image_path}")
             raise ImagePathError(image_path, "路径不是文件")
-        
+
         # 检查文件大小
         file_size = path.stat().st_size
         if file_size > self.max_image_size:
@@ -161,7 +161,7 @@ class ImageProcessor:
             raise ImageSizeExceededError(
                 file_size, self.max_image_size
             )
-        
+
         # 检查文件扩展名是否为已知图像格式
         ext = path.suffix.lstrip('.').lower()
         if ext not in MIME_TYPES:
@@ -169,16 +169,16 @@ class ImageProcessor:
             # 可以选择是否在严格模式下抛出异常
             if getattr(self, 'strict_format_check', False):
                 raise ImageFormatError(ext)
-        
+
         return str(path)
-    
+
     def _is_valid_base64(self, base64_str: str) -> bool:
         """
         检查字符串是否为有效的base64编码
-        
+
         Args:
             base64_str: 待检查的base64字符串
-            
+
         Returns:
             是否为有效的base64编码
         """
@@ -186,44 +186,44 @@ class ImageProcessor:
             # 检查字符是否符合base64编码规则 (A-Z, a-z, 0-9, +, /, =)
             if not re.match(r'^[A-Za-z0-9+/]+={0,2}$', base64_str):
                 return False
-            
+
             # 尝试解码
             decoded = base64.b64decode(base64_str)
             return True
         except Exception:
             return False
-    
+
     def _detect_image_type_from_bytes(self, image_bytes: bytes) -> str:
         """
         从图像字节数据检测图像类型
-        
+
         Args:
             image_bytes: 图像字节数据
-            
+
         Returns:
             图像类型的MIME字符串
         """
         # 默认MIME类型
         default_mime = 'image/png'
-        
+
         # 检查魔术字节
         for magic, format_name in MAGIC_BYTES.items():
             if image_bytes.startswith(magic):
                 return MIME_TYPES.get(format_name, default_mime)
-        
+
         # 无法识别则返回默认值
         return default_mime
-    
+
     def _load_and_detect_image(self, image_path: str) -> Tuple[str, bytes]:
         """
         加载图像文件并检测其类型
-        
+
         Args:
             image_path: 图像文件路径
-            
+
         Returns:
             Tuple[str, bytes]: (MIME类型, 图像字节数据)
-            
+
         Raises:
             ImagePathError: 路径无效或不存在
             ImageSizeExceededError: 图片大小超过限制
@@ -232,37 +232,37 @@ class ImageProcessor:
         """
         # 验证文件路径
         validated_path = self._validate_file_path(image_path)
-        
+
         try:
             # 读取文件
             with open(validated_path, "rb") as image_file:
                 image_data = image_file.read()
-            
+
             # 检测MIME类型
             # 先尝试从扩展名获取
             ext = Path(validated_path).suffix.lstrip('.').lower()
             mime_type = MIME_TYPES.get(ext)
-            
+
             # 如果扩展名不存在或无法识别，尝试通过魔术字节判断
             if not mime_type:
                 mime_type = self._detect_image_type_from_bytes(image_data[:8])
-                
+
             return mime_type, image_data
         except OSError as e:
             logger.error(f"读取图片文件时出错: {str(e)}")
             raise ImageReadError(validated_path, str(e))
-    
-    def process_image_file(self, image_path: str, mode: Literal["question", "answer"] = "question") -> str:
+
+    async def process_image_file(self, image_path: str, mode: Literal["question", "answer"] = "question") -> str:
         """
         处理图像文件并提取文本
-        
+
         Args:
             image_path: 图像文件路径
             mode: 处理模式，"question"提取题目，"answer"提取答案
-            
+
         Returns:
             提取的文本内容
-            
+
         Raises:
             ImagePathError: 路径无效或不存在
             ImageSizeExceededError: 图像大小超出限制
@@ -274,31 +274,31 @@ class ImageProcessor:
         try:
             # 加载图像并检测类型
             mime_type, image_data = self._load_and_detect_image(image_path)
-            
+
             # 编码为base64
             base64_image = base64.b64encode(image_data).decode('utf-8')
-            
-            # 调用VLM提取文本
-            return self.process_image_base64(base64_image, mime_type, mode)
+
+            # 异步调用VLM提取文本
+            return await self.process_image_base64(base64_image, mime_type, mode)
         except (ImagePathError, ImageSizeExceededError, ImageFormatError, ImageReadError, InvalidBase64Error) as e:
             # 已知的特定异常，直接抛出
             raise
         except Exception as e:
             logger.error(f"处理图像文件时出错: {str(e)}")
             raise ImageProcessingAPIError(str(e))
-    
-    def process_image_base64(self, base64_image: str, mime_type: str = 'image/png', mode: Literal["question", "answer"] = "question") -> str:
+
+    async def process_image_base64(self, base64_image: str, mime_type: str = 'image/png', mode: Literal["question", "answer"] = "question") -> str:
         """
         处理base64编码的图像并提取文本
-        
+
         Args:
             base64_image: base64编码的图像
             mime_type: 图像的MIME类型，默认为'image/png'
             mode: 处理模式，"question"提取题目，"answer"提取答案
-            
+
         Returns:
             提取的文本内容
-            
+
         Raises:
             InvalidBase64Error: base64字符串无效
             ImageSizeExceededError: 图像大小超出限制
@@ -308,7 +308,7 @@ class ImageProcessor:
         if not self._is_valid_base64(base64_image):
             logger.error("提供的字符串不是有效的base64编码")
             raise InvalidBase64Error()
-        
+
         # 检查图片大小（近似值，base64编码比原始数据大约大1/3）
         approx_size = (len(base64_image) * 3) // 4
         if approx_size > self.max_image_size:
@@ -316,7 +316,7 @@ class ImageProcessor:
             raise ImageSizeExceededError(
                 approx_size, self.max_image_size
             )
-        
+
         try:
             # 根据模式选择适当的提示语
             if mode == "question":
@@ -325,14 +325,14 @@ class ImageProcessor:
             else:  # mode == "answer"
                 system_prompt = VLM_EXTRACT_ANSWER_SYSTEM_PROMPT
                 user_prompt = VLM_EXTRACT_ANSWER_PROMPT
-            
+
             # 创建消息
             messages = [
                 SystemMessage(content=system_prompt),
                 HumanMessage(
                     content=[
                         {
-                            "type": "text", 
+                            "type": "text",
                             "text": user_prompt
                         },
                         {
@@ -345,27 +345,27 @@ class ImageProcessor:
                     ]
                 )
             ]
-            
-            # 调用VLM
-            response = self.vlm.invoke(messages)
-            
+
+            # 异步调用VLM
+            response = await self.vlm.ainvoke(messages)
+
             # 返回内容
             return response.content
         except Exception as e:
             logger.error(f"处理base64图像时出错: {str(e)}")
             raise ImageProcessingAPIError(str(e))
-    
-    def process_image_bytes(self, image_bytes: bytes, mode: Literal["question", "answer"] = "question") -> str:
+
+    async def process_image_bytes(self, image_bytes: bytes, mode: Literal["question", "answer"] = "question") -> str:
         """
         处理图像字节数据并提取文本
-        
+
         Args:
             image_bytes: 图像的字节数据
             mode: 处理模式，"question"提取题目，"answer"提取答案
-            
+
         Returns:
             提取的文本内容
-            
+
         Raises:
             ImageSizeExceededError: 图像大小超出限制
             ImageFormatError: 不支持的图像格式
@@ -378,19 +378,19 @@ class ImageProcessor:
             raise ImageSizeExceededError(
                 len(image_bytes), self.max_image_size
             )
-        
+
         try:
             # 检测图像类型
             mime_type = self._detect_image_type_from_bytes(image_bytes[:8])
-            
+
             # 编码图像
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
-            
-            # 调用VLM提取文本
-            return self.process_image_base64(base64_image, mime_type, mode)
+
+            # 异步调用VLM提取文本
+            return await self.process_image_base64(base64_image, mime_type, mode)
         except (ImageSizeExceededError, InvalidBase64Error) as e:
             # 已知的特定异常，直接抛出
             raise
         except Exception as e:
             logger.error(f"处理图像字节数据时出错: {str(e)}")
-            raise ImageProcessingAPIError(str(e)) 
+            raise ImageProcessingAPIError(str(e))

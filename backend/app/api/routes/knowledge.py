@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.services import knowledge as knowledge_service
 from app.api.deps import get_current_user
 from app.api.schemas.knowledge import (
-    KnowledgePoint, 
+    KnowledgePoint,
     KnowledgePointCreate,
     KnowledgePointSearch,
     KnowledgeStructure,
@@ -158,7 +158,7 @@ async def create_user_mark(
     knowledge_point = knowledge_service.get_knowledge_point_by_id(db, mark_data.knowledge_point_id)
     if not knowledge_point:
         raise HTTPException(status_code=404, detail="知识点不存在")
-    
+
     # 创建标记
     user_mark = knowledge_service.create_user_mark(
         db=db,
@@ -166,7 +166,7 @@ async def create_user_mark(
         knowledge_point_id=mark_data.knowledge_point_id,
         question_id=mark_data.question_id
     )
-    
+
     return user_mark
 
 @router.post("/", response_model=KnowledgePoint, status_code=status.HTTP_201_CREATED)
@@ -185,13 +185,13 @@ async def create_knowledge_point(
         KnowledgePointModel.section == knowledge_point_data.section,
         KnowledgePointModel.item == knowledge_point_data.item
     ).first()
-    
+
     if existing_knowledge_point:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="相同知识点已存在"
         )
-    
+
     # 创建知识点
     return knowledge_service.create_knowledge_point(
         db=db,
@@ -211,20 +211,20 @@ async def analyze_knowledge_from_question(
     返回：
         categories: 知识点类别的列表
 
-    
+
     """
     # 获取所有知识点类别的CSV格式
     categories_csv = knowledge_service.get_all_categories_csv(db)
-    
+
     # 创建知识点检索器
     retriever = LLMKnowledgeRetriever()
-    
+
     # 分析题目
-    categories_data = retriever.analyze_knowledge_category(
+    categories_data = await retriever.analyze_knowledge_category(
         question_text=request.question_text,
         categories_csv=categories_csv
     )
-    
+
     # 转换为响应格式
     categories = [
         KnowledgeCategory(
@@ -234,11 +234,11 @@ async def analyze_knowledge_from_question(
         )
         for cat in categories_data
     ]
-    
+
     return KnowledgeAnalyzeResponse(
         categories=categories,
 
-    ) 
+    )
 
 @router.post("/extract-from-solution", response_model=KnowledgeExtractResponse)
 async def extract_knowledge_from_solution(
@@ -258,7 +258,7 @@ async def extract_knowledge_from_solution(
     """
     # 初始化知识点提取器
     extractor = KnowledgeExtractor()
-    
+
     # 获取可能用到的知识点
     existing_knowledge_points = []
     if request.existing_knowledge_point_ids:
@@ -274,14 +274,14 @@ async def extract_knowledge_from_solution(
                     "item": kp.item,
                     "details": kp.details
                 })
-    
+
     # 从解题过程提取知识点，等待异步方法完成
     used_existing_points, new_points = await extractor.extract_knowledge_points_from_solution(
         question_text=request.question_text,
         solution_text=request.solution_text,
         existing_knowledge_points=existing_knowledge_points
     )
-    
+
 
     # 获取已使用的知识点完整信息
     used_existing_knowledge_points = []
@@ -291,7 +291,7 @@ async def extract_knowledge_from_solution(
             kp = knowledge_service.get_knowledge_point_by_id(db, kp_id)
             if kp:
                 used_existing_knowledge_points.append(kp)
-    
+
     # 准备新识别的知识点
     new_knowledge_points = [
         KnowledgePointInfo(
@@ -304,7 +304,7 @@ async def extract_knowledge_from_solution(
         )
         for point in new_points
     ]
-    
+
     return KnowledgeExtractResponse(
         existing_knowledge_points=used_existing_knowledge_points,
         new_knowledge_points=new_knowledge_points
@@ -329,7 +329,7 @@ async def mark_confirmed_knowledge_points(
     """
     # 处理确认的知识点标记
     new_knowledge_points_data = [kp.model_dump() for kp in request.new_knowledge_points]
-    
+
     marked_points = knowledge_marking.apply_confirmed_markings(
         db=db,
         user_id=current_user.id,
@@ -337,8 +337,8 @@ async def mark_confirmed_knowledge_points(
         existing_knowledge_point_ids=request.existing_knowledge_point_ids,
         new_knowledge_points=new_knowledge_points_data
     )
-    
+
     return KnowledgeMarkResponse(
         question_id=request.question_id,
         marked_knowledge_points=marked_points
-    ) 
+    )

@@ -24,13 +24,9 @@ async def solve_question(
     返回:
     - 解题结果，包括解题步骤和相关知识点
     """
-    # 将知识点ID列表转换为所需格式
     knowledge_points_data = [{"id": kp_id} for kp_id in request_data.knowledge_points]
     
-    # 这里应该添加检查，确保用户只能解答自己的错题
-    # (如果需要，可以在这里根据 current_user.id 检查 question_id 的所有权)
-    
-    result = solving_service.solve_question(
+    result = await solving_service.solve_question(
         db=db, 
         question_id=question_id, 
         knowledge_points_data=knowledge_points_data
