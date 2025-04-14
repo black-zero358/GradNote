@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from app.db.session import get_db
 from app.services import knowledge as knowledge_service
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_active_user
 from app.api.schemas.knowledge import (
     KnowledgePoint,
     KnowledgePointCreate,
@@ -34,7 +34,8 @@ async def get_knowledge_points_by_structure(
     subject: str = Query(..., description="科目"),
     chapter: Optional[str] = Query(None, description="章节"),
     section: Optional[str] = Query(None, description="小节"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     基于结构化信息（科目、章节、小节）查询知识点
@@ -56,7 +57,8 @@ async def search_knowledge_points(
     sort_by: Optional[str] = Query(None, description="排序字段，例如：mark_count, created_at"),
     skip: int = Query(0, description="跳过的记录数"),
     limit: int = Query(100, description="返回的最大记录数"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     按条件搜索知识点
@@ -73,7 +75,8 @@ async def search_knowledge_points(
 @router.get("/popular", response_model=List[KnowledgePoint])
 async def get_popular_knowledge_points(
     limit: int = Query(10, description="返回的记录数"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     获取最热门的知识点（根据标记次数）
@@ -81,7 +84,10 @@ async def get_popular_knowledge_points(
     return knowledge_service.get_popular_knowledge_points(db, limit)
 
 @router.get("/subjects", response_model=List[str])
-async def get_subjects(db: Session = Depends(get_db)):
+async def get_subjects(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     获取所有科目列表
     """
@@ -90,7 +96,8 @@ async def get_subjects(db: Session = Depends(get_db)):
 @router.get("/chapters", response_model=List[str])
 async def get_chapters(
     subject: str = Query(..., description="科目名称"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     获取指定科目的所有章节
@@ -101,7 +108,8 @@ async def get_chapters(
 async def get_sections(
     subject: str = Query(..., description="科目名称"),
     chapter: str = Query(..., description="章节名称"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     获取指定科目和章节的所有小节
@@ -121,7 +129,8 @@ async def get_user_marks(
 @router.get("/{knowledge_point_id}", response_model=KnowledgePoint)
 async def get_knowledge_point(
     knowledge_point_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     根据ID获取知识点详情
@@ -201,7 +210,8 @@ async def create_knowledge_point(
 @router.post("/analyze-from-question", response_model=KnowledgeAnalyzeResponse)
 async def analyze_knowledge_from_question(
     request: KnowledgeAnalyzeRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     分析题目文本，返回可能的知识点类别
@@ -243,7 +253,8 @@ async def analyze_knowledge_from_question(
 @router.post("/extract-from-solution", response_model=KnowledgeExtractResponse)
 async def extract_knowledge_from_solution(
     request: KnowledgeExtractRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     从解题过程中提取使用的知识点，区分"已有知识点"和"新知识点"
