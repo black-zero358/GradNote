@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     
     # LLM服务配置
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "deepseek-r1-250120")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "deepseek-v3-250324")
     VLM_MODEL: str = os.getenv("VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
     
     # LANGFUSE配置

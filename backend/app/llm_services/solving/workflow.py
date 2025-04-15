@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # 从环境变量获取配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
-OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-r1-250120")
+OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-v3-250324")
 
 # 从环境变量获取特定任务的模型配置，如果未设置，则使用OPENAI_LLM_MODEL
 LLM_SOLVING_MODEL = os.getenv("LLM_SOLVING_MODEL", OPENAI_LLM_MODEL)
