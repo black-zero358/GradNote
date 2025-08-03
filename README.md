@@ -3,7 +3,7 @@
 <div align="center">
   <img src="https://s2.loli.net/2025/04/09/B87fAZSpOULqcDo.webp" alt="GradNote Logo" width="200" height="200" style="display:none;">
 
-  ![GitHub](https://img.shields.io/github/license/black-zero358/GradNote)
+  ![GitHub](https://img.shields.io/github/license/black-zero358/GradNote.svg?cache=2)
   ![Python](https://img.shields.io/badge/python-3.13-blue.svg)
   ![FastAPI](https://img.shields.io/badge/FastAPI-0.115.11+-green.svg)
   ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17.4-blue.svg)
