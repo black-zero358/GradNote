@@ -1,20 +1,51 @@
 import os
+import sys
 from typing import Optional, Dict, Any, List
 from pydantic import PostgresDsn, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings
+
+def validate_required_env_vars() -> None:
+    """
+    验证必需的环境变量是否存在
+    如果缺少关键的环境变量，应用将无法启动
+    """
+    required_vars = {
+        "SECRET_KEY": "JWT密钥，用于令牌签名",
+        "POSTGRES_PASSWORD": "PostgreSQL数据库密码",
+        "FIRST_SUPERUSER": "初始管理员用户名",
+        "FIRST_SUPERUSER_PASSWORD": "初始管理员密码",
+        "FIRST_SUPERUSER_EMAIL": "初始管理员邮箱"
+    }
+    
+    missing_vars = []
+    for var_name, description in required_vars.items():
+        if not os.getenv(var_name):
+            missing_vars.append(f"  - {var_name}: {description}")
+    
+    if missing_vars:
+        error_msg = (
+            "❌ 安全错误：缺少必需的环境变量\n\n"
+            "以下环境变量是必需的，但未设置：\n"
+            + "\n".join(missing_vars) + "\n\n"
+            "请设置这些环境变量后重新启动应用。\n"
+            "参考 .env.example 文件了解如何配置。\n"
+        )
+        print(error_msg, file=sys.stderr)
+        sys.exit(1)
+
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # JWT相关配置
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-for-development")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24小时
     
     # 数据库配置
     POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "123456")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "GradNote")
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
     DATABASE_URI: Optional[str] = None
@@ -31,8 +62,7 @@ class Settings(BaseSettings):
         required_keys = ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_SERVER", "POSTGRES_PORT", "POSTGRES_DB"]
         for key in required_keys:
             if key not in data or not data.get(key):
-                # 如果配置不完整，返回一个默认的本地开发URI
-                return "postgresql://postgres:123456@localhost:5432/GradNote"
+                raise ValueError(f"数据库配置不完整：缺少 {key} 环境变量")
         
         # 使用字符串拼接而不是PostgresDsn.build，避免编码问题
         return f"postgresql://{data.get('POSTGRES_USER')}:{data.get('POSTGRES_PASSWORD')}@{data.get('POSTGRES_SERVER')}:{data.get('POSTGRES_PORT')}/{data.get('POSTGRES_DB')}"
@@ -79,5 +109,8 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
         extra = "ignore"  # 允许额外的字段，忽略不在模型中定义的字段
+
+# 在创建settings实例前验证必需的环境变量
+validate_required_env_vars()
 
 settings = Settings() 
