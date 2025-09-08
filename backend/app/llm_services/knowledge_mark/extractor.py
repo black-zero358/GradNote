@@ -306,6 +306,6 @@ class KnowledgeExtractor:
             
         except json.JSONDecodeError:
             # log
-            logger.error(f"解析失败:result {result}, content {response.content}")
+            logger.error(f"解析失败: content {response.content}")
             # 如果解析失败，返回空结果
             return [], []
