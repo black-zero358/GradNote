@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+import os
 from app.core.config import settings
 from app.services.user import create_user, get_user_by_username
 from app.api.schemas.user import UserCreate
@@ -9,10 +10,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 初始测试用户
-FIRST_SUPERUSER = "admin"
-FIRST_SUPERUSER_PASSWORD = "admin"
-FIRST_SUPERUSER_EMAIL = "admin@example.com"
+# 从环境变量获取初始用户配置
+FIRST_SUPERUSER = os.getenv("FIRST_SUPERUSER", "")
+FIRST_SUPERUSER_PASSWORD = os.getenv("FIRST_SUPERUSER_PASSWORD", "")
+FIRST_SUPERUSER_EMAIL = os.getenv("FIRST_SUPERUSER_EMAIL", "")
 
 # 初始知识点数据 - 简化并使用ASCII字符
 INITIAL_KNOWLEDGE_POINTS = [
@@ -57,6 +58,11 @@ def init_db(db: Session) -> None:
     """
     初始化数据库
     """
+    # 检查初始用户配置
+    if not all([FIRST_SUPERUSER, FIRST_SUPERUSER_PASSWORD, FIRST_SUPERUSER_EMAIL]):
+        logger.error("初始管理员用户配置不完整，请设置 FIRST_SUPERUSER、FIRST_SUPERUSER_PASSWORD 和 FIRST_SUPERUSER_EMAIL 环境变量")
+        return
+    
     # 创建初始管理员用户
     user = get_user_by_username(db, FIRST_SUPERUSER)
     if not user:
