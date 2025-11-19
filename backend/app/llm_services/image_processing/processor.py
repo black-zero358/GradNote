@@ -12,6 +12,9 @@ from langfuse.callback import CallbackHandler
 
 # 从环境变量获取配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    logger.warning("未设置 OPENAI_API_KEY 环境变量")
+
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 OPENAI_VLM_MODEL = os.getenv("OPENAI_VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
 

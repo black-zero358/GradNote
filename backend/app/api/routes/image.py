@@ -50,10 +50,11 @@ async def process_image(
     - UNKNOWN_ERROR: 未知错误
     """
     # 检查文件类型
-    if not file.content_type.startswith('image/'):
+    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"}
+    if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="仅支持图像文件"
+            detail=f"不支持的文件类型: {file.content_type}. 仅支持: {', '.join(ALLOWED_TYPES)}"
         )
     
     # 读取文件内容
@@ -129,10 +130,11 @@ async def process_answer_image(
     - UNKNOWN_ERROR: 未知错误
     """
     # 检查文件类型
-    if not file.content_type.startswith('image/'):
+    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"}
+    if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="仅支持图像文件"
+            detail=f"不支持的文件类型: {file.content_type}. 仅支持: {', '.join(ALLOWED_TYPES)}"
         )
     
     # 读取文件内容
