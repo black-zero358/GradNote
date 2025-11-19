@@ -73,7 +73,8 @@ curl -X GET "http://localhost:8000/api/v1/questions" \
   {
     "id": 1,
     "username": "用户名",
-    "email": "邮箱地址"
+    "email": "邮箱地址",
+    "created_at": "2023-01-01T12:00:00"
   }
   ```
 - **状态码**:
@@ -235,34 +236,7 @@ curl -X GET "http://localhost:8000/api/v1/questions" \
   - `200`: 删除成功
   - `404`: 错题不存在
 
-### 从图片创建错题
 
-- **URL**: `/questions/from-image`
-- **方法**: `POST`
-- **描述**: 从上传的图片中提取文本并创建错题
-- **认证**: 需要Bearer Token
-- **请求体**: 表单数据，包含图片文件
-  - `file`: 图片文件（multipart/form-data）
-- **响应**:
-  ```json
-  {
-    "id": 1,
-    "content": "从图片提取的题目内容",
-    "subject": "识别的科目",
-    "solution": "",
-    "answer": "",
-    "image_url": "保存的图片URL",
-    "remark": "",
-    "user_id": 1,
-    "created_at": "创建时间"
-  }
-  ```
-- **状态码**:
-  - `200`: 创建成功
-  - `400`: 文件格式不支持
-  - `413`: 文件过大
-  - `422`: 参数验证错误
-  - `500`: 图像处理失败
 
 ## 知识点API
 
@@ -519,6 +493,61 @@ curl -X GET "http://localhost:8000/api/v1/questions" \
   - `404`: 知识点或错题不存在
   - `422`: 参数验证错误
 
+### 确认知识点标记
+
+- **URL**: `/knowledge/mark-confirmed`
+- **方法**: `POST`
+- **描述**: 处理用户确认的知识点标记，包括已有知识点和新知识点
+- **认证**: 需要Bearer Token
+- **请求体**:
+  ```json
+  {
+    "question_id": 1,
+    "existing_knowledge_point_ids": [1, 2],
+    "new_knowledge_points": [
+      {
+        "subject": "数学",
+        "chapter": "高等数学",
+        "section": "微分",
+        "item": "新知识点",
+        "details": "详细说明",
+        "is_existing": false
+      }
+    ]
+  }
+  ```
+- **响应**:
+  ```json
+  {
+    "question_id": 1,
+    "marked_knowledge_points": [
+      {
+        "id": 1,
+        "subject": "数学",
+        "chapter": "高等数学",
+        "section": "微分",
+        "item": "导数定义",
+        "details": "导数的定义与计算方法",
+        "mark_count": 6,
+        "created_at": "2023-01-01T12:00:00"
+      },
+      {
+        "id": 3,
+        "subject": "数学",
+        "chapter": "高等数学",
+        "section": "微分",
+        "item": "新知识点",
+        "details": "详细说明",
+        "mark_count": 1,
+        "created_at": "2023-10-27T10:00:00"
+      }
+    ]
+  }
+  ```
+- **状态码**:
+  - `200`: 标记成功
+  - `422`: 参数验证错误
+
 ### 获取用户标记
 
 - **URL**: `/knowledge/user-marks`
@@ -649,17 +678,21 @@ curl -X GET "http://localhost:8000/api/v1/questions" \
   ```json
   {
     "status": "success",
-    "solution": "解题步骤详细内容...",
-    "knowledge_points": [
-      {
-        "id": 1,
-        "subject": "数学",
-        "chapter": "高等数学",
-        "section": "微分",
-        "item": "导数定义",
-        "details": "导数的定义与计算方法"
-      }
-    ]
+    "message": "解题成功",
+    "data": {
+      "question": "题目内容...",
+      "solution": "解题步骤详细内容...",
+      "knowledge_points": [
+        {
+          "id": 1,
+          "subject": "数学",
+          "chapter": "高等数学",
+          "section": "微分",
+          "item": "导数定义",
+          "details": "导数的定义与计算方法"
+        }
+      ]
+    }
   }
   ```
 - **状态码**:
