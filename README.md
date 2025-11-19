@@ -3,7 +3,7 @@
 <div align="center">
   <img src="https://s2.loli.net/2025/04/09/B87fAZSpOULqcDo.webp" alt="GradNote Logo" width="200" height="200" style="display:none;">
 
-  ![GitHub](https://img.shields.io/github/license/black-zero358/GradNote)
+  ![GitHub](https://img.shields.io/github/license/black-zero358/GradNote.svg?cache=2)
   ![Python](https://img.shields.io/badge/python-3.13-blue.svg)
   ![FastAPI](https://img.shields.io/badge/FastAPI-0.115.11+-green.svg)
   ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17.4-blue.svg)
@@ -11,7 +11,7 @@
 
 ## 📚 项目概述
 
-GradNote是一个基于FastAPI和大型语言模型(LLM)的错题知识点管理系统，帮助学生和教师高效管理、分析和利用错题资源。系统自动从错题中提取知识点，构建知识图谱，并提供智能化的学习建议。
+GradNote是一个基于FastAPI和大型语言模型(LLM)的错题知识点管理系统，帮助学生和教师高效管理、分析和利用错题资源。系统自动从错题中提取知识点，构建知识图谱，并提供智能化的学习建议。该仓库为项目的后端仓库。
 
 ### 🎯 核心目标
 
