@@ -3,6 +3,9 @@ import os
 from typing import Dict, List, Optional, Tuple
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
+from langfuse.callback import CallbackHandler
+
+class KnowledgeExtractor:
     def __init__(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model_name: Optional[str] = None):
         """
         初始化知识点提取器

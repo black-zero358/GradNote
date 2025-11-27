@@ -83,4 +83,29 @@ class Settings(BaseSettings):
         env_file = ".env"
         extra = "ignore"  # 允许额外的字段，忽略不在模型中定义的字段
 
-settings = Settings()
+try:
+    settings = Settings()
+except Exception as e:
+    import sys
+    from pydantic import ValidationError
+    
+    if isinstance(e, ValidationError):
+        print("\n" + "="*60)
+        print("❌ 启动失败：缺少必要的环境变量配置")
+        print("="*60)
+        print("\n缺少以下配置项：")
+        for error in e.errors():
+            # 获取字段名
+            field = error.get("loc", ["unknown"])[0]
+            msg = error.get("msg", "")
+            print(f"  - {field}: {msg}")
+            
+        print("\n💡 解决方法：")
+        print("1. 请确保目录下存在 .env 文件")
+        print("2. 如果是首次运行，请复制示例配置：")
+        print("   cp .env.example .env")
+        print("3. 编辑 .env 文件，填入正确的数据库和密钥配置")
+        print("="*60 + "\n")
+        sys.exit(1)
+    else:
+        raise e
