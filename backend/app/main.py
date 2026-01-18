@@ -30,7 +30,7 @@ app = FastAPI(
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 在生产环境中应该设置为特定域名
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,21 +47,29 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.on_event("startup")
 async def startup_db_client():
     """应用启动时创建数据库表并初始化数据"""
-    try:
-        # 创建所有表
-        create_tables()
-        
-        # 创建数据库索引
-        create_indexes()
-        
-        # 初始化数据库数据
-        db = SessionLocal()
-        init_db(db)
-        # 重置序列
-        reset_all_sequences()
-        db.close()
-    except Exception as e:
-        logger.error(f"数据库初始化失败: {e}")
+    # 仅在显式启用时运行数据库初始化
+    run_db_init = os.getenv("RUN_DB_INIT", "false").lower() == "true"
+    
+    if run_db_init:
+        try:
+            logger.info("正在初始化数据库...")
+            # 创建所有表
+            create_tables()
+            
+            # 创建数据库索引
+            create_indexes()
+            
+            # 初始化数据库数据
+            db = SessionLocal()
+            init_db(db)
+            # 重置序列
+            reset_all_sequences()
+            db.close()
+            logger.info("数据库初始化完成")
+        except Exception as e:
+            logger.error(f"数据库初始化失败: {e}")
+    else:
+        logger.info("跳过数据库初始化 (设置 RUN_DB_INIT=true 以启用)")
 
 @app.get("/")
 async def root():

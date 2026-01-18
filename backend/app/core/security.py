@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional, Union, Any
+import secrets
 from jose import jwt
 from passlib.context import CryptContext
 from app.core.config import settings
@@ -29,4 +30,72 @@ def get_password_hash(password: str) -> str:
     """
     获取密码哈希
     """
-    return pwd_context.hash(password) 
+    return pwd_context.hash(password)
+
+def generate_secure_password(length: int = 16) -> str:
+    """
+    生成安全的随机密码
+    
+    Args:
+        length: 密码长度，默认16位
+        
+    Returns:
+        生成的随机密码字符串
+        
+    密码包含：
+    - 大写字母 (A-Z)
+    - 小写字母 (a-z) 
+    - 数字 (0-9)
+    - 特殊符号 (!@#$%^&*)
+    - 排除易混淆字符 (0, O, l, 1, I)
+    """
+    # 定义字符集，排除易混淆字符
+    uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'  # 排除I和O
+    lowercase = 'abcdefghjkmnpqrstuvwxyz'  # 排除l和o
+    digits = '23456789'  # 排除0和1
+    special_chars = '!@#$%^&*'
+    
+    # 确保密码至少包含每种类型的字符
+    password_chars = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase), 
+        secrets.choice(digits),
+        secrets.choice(special_chars)
+    ]
+    
+    # 填充剩余长度
+    all_chars = uppercase + lowercase + digits + special_chars
+    for _ in range(length - 4):
+        password_chars.append(secrets.choice(all_chars))
+    
+    # 随机打乱字符顺序
+    secrets.SystemRandom().shuffle(password_chars)
+    
+    password = ''.join(password_chars)
+    
+    # 验证生成的密码强度
+    if validate_password_strength(password):
+        return password
+    else:
+        # 递归重新生成（理论上很少发生）
+        return generate_secure_password(length)
+
+def validate_password_strength(password: str) -> bool:
+    """
+    验证密码强度是否符合要求
+    
+    Args:
+        password: 待验证的密码
+        
+    Returns:
+        True如果密码符合强度要求，否则False
+    """
+    if len(password) < 12:
+        return False
+        
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_special = any(c in '!@#$%^&*' for c in password)
+    
+    return all([has_upper, has_lower, has_digit, has_special]) 

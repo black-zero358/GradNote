@@ -10,8 +10,14 @@ from langchain_openai import ChatOpenAI
 from langchain.schema.messages import HumanMessage, SystemMessage
 from langfuse.callback import CallbackHandler
 
+# 配置日志
+logger = logging.getLogger(__name__)
+
 # 从环境变量获取配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    logger.warning("未设置 OPENAI_API_KEY 环境变量")
+
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
 OPENAI_VLM_MODEL = os.getenv("OPENAI_VLM_MODEL", "doubao-1-5-vision-pro-32k-250115")
 
@@ -47,8 +53,7 @@ MAGIC_BYTES = {
     b'\x4d\x4d\x00\x2a': 'tiff',      # TIFF
 }
 
-# 配置日志
-logger = logging.getLogger(__name__)
+
 
 class ImageProcessorError(Exception):
     """图像处理器异常基类"""

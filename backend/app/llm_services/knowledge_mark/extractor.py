@@ -4,19 +4,8 @@ from typing import Dict, List, Optional, Tuple
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
 from langfuse.callback import CallbackHandler
-import logging
-
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-# 从环境变量获取配置
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
-OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-r1-250120")
 
 class KnowledgeExtractor:
-    """知识点提取器，用于从题目和解题过程中提取知识点"""
-    
     def __init__(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model_name: Optional[str] = None):
         """
         初始化知识点提取器
