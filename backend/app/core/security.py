@@ -23,14 +23,20 @@ def create_access_token(subject: Union[str, Any], expires_delta: Optional[timede
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     验证密码
+    bcrypt 限制密码最大长度为 72 字节，需要截断
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    # bcrypt 有 72 字节限制，截断密码
+    truncated_password = plain_password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+    return pwd_context.verify(truncated_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """
     获取密码哈希
+    bcrypt 限制密码最大长度为 72 字节，需要截断
     """
-    return pwd_context.hash(password)
+    # bcrypt 有 72 字节限制，截断密码
+    truncated_password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+    return pwd_context.hash(truncated_password)
 
 def generate_secure_password(length: int = 16) -> str:
     """
