@@ -4,6 +4,10 @@ from typing import Dict, List, Optional, Tuple
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
 from langfuse.callback import CallbackHandler
+# 从环境变量获取配置
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
+OPENAI_LLM_MODEL = os.getenv("OPENAI_LLM_MODEL", "deepseek-v3-250324")
 
 class KnowledgeExtractor:
     def __init__(self, api_key: Optional[str] = None, api_base: Optional[str] = None, model_name: Optional[str] = None):
