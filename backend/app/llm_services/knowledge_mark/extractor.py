@@ -1,9 +1,12 @@
 import json
 import os
+import logging
 from typing import Dict, List, Optional, Tuple
 from langchain.schema import Document
 from langchain_openai import ChatOpenAI
 from langfuse.callback import CallbackHandler
+
+logger = logging.getLogger(__name__)
 # 从环境变量获取配置
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = os.getenv("OPENAI_API_BASE")
